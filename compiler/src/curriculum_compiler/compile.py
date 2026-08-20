@@ -245,7 +245,10 @@ def _rubric(module: dict[str, Any], release_id: str) -> dict[str, Any]:
 def compile_release(source_dir: Path, output_dir: Path, program_id: str, release_version: str) -> Path:
     modules = load_modules(source_dir)
     validate_modules(modules)
-    normalized = [{"source_path": path.as_posix(), "module": module} for path, module in modules]
+    normalized = [
+        {"source_path": path.relative_to(source_dir).as_posix(), "module": module}
+        for path, module in modules
+    ]
     source_digest = _sha256_bytes(_canonical(normalized))
     release_id = f"{program_id}@{release_version}@{source_digest[:12]}"
     release_dir = output_dir / "releases" / program_id / release_version
@@ -324,7 +327,7 @@ def compile_release(source_dir: Path, output_dir: Path, program_id: str, release
         "release_version": release_version,
         "compiler_version": COMPILER_VERSION,
         "source_digest": source_digest,
-        "source_files": [path.as_posix() for path, _ in modules],
+        "source_files": [path.relative_to(source_dir).as_posix() for path, _ in modules],
         "artifacts": sorted(artifacts, key=lambda item: item["path"]),
         "claims_profile": "public-launch",
         "content_status": "generated-from-reviewed-source-specifications",

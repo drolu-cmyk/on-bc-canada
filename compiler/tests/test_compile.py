@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -28,9 +29,12 @@ class CompilerTests(unittest.TestCase):
             first_root = Path(first)
             second_root = Path(second)
             first_manifest = compile_release(SOURCE, first_root, "applied-ai-training-canada", "0.1.0")
-            second_manifest = compile_release(SOURCE, second_root, "applied-ai-training-canada", "0.1.0")
+            copied_source = second_root / "source"
+            shutil.copytree(SOURCE, copied_source)
+            second_output = second_root / "out"
+            second_manifest = compile_release(copied_source, second_output, "applied-ai-training-canada", "0.1.0")
 
-            self.assertEqual(file_hashes(first_root), file_hashes(second_root))
+            self.assertEqual(file_hashes(first_root), file_hashes(second_output))
             self.assertTrue(first_manifest.exists())
             release_root = first_manifest.parent
             self.assertTrue((release_root / "evidence-index.json").exists())
