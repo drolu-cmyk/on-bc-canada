@@ -1,0 +1,163 @@
+data_controls:
+  control_id: learner-data-boundary
+  version: 0.1.0
+  reference_region: ca-central-1
+  record_classes:
+    - id: enrollment
+      purpose: Route access, capacity, consent, and next actions.
+      allowed_fields:
+        - learner_ref
+        - cohort_id
+        - consent_id
+        - policy_version
+        - status
+      prohibited_fields:
+        - government_identifier
+        - financial_account
+        - private_key
+        - production_credential
+      storage:
+        primary: dynamodb
+        region: ca-central-1
+        encryption: aws_kms
+        versioning: true
+      retention_class: cohort_lifecycle
+      deletion_trigger: withdrawal_and_retention_expiry
+      access_roles:
+        - learner_operations_owner
+        - credential_authorizer
+
+    - id: attendance
+      purpose: Preserve session participation and alternate-path evidence.
+      allowed_fields:
+        - learner_ref
+        - cohort_id
+        - session_id
+        - status
+        - evidence_refs
+        - policy_version
+      prohibited_fields:
+        - session_recording_without_approval
+        - unrelated_personal_information
+        - production_customer_data
+      storage:
+        primary: dynamodb
+        region: ca-central-1
+        encryption: aws_kms
+        versioning: true
+      retention_class: credential_record
+      deletion_trigger: credential_record_expiry_or_correction
+      access_roles:
+        - instructor
+        - credential_authorizer
+        - quality_reviewer
+
+    - id: support
+      purpose: Route accessibility, safety, privacy, technical, and learning support.
+      allowed_fields:
+        - learner_ref
+        - category
+        - priority
+        - status
+        - route
+        - evidence_refs
+      prohibited_fields:
+        - unnecessary_diagnosis
+        - private_key
+        - production_credential
+        - real_customer_record
+      storage:
+        primary: dynamodb
+        region: ca-central-1
+        encryption: aws_kms
+        versioning: true
+      retention_class: quality_record
+      deletion_trigger: case_resolution_plus_retention_expiry
+      access_roles:
+        - learner_support_owner
+        - safety_and_security_owner
+        - operator
+
+    - id: shared-artifacts
+      purpose: Share generated program, learning, and funder evidence artifacts.
+      allowed_fields:
+        - artifact_id
+        - release_version
+        - evidence_refs
+        - audience
+        - expiry
+        - deidentified_metrics
+      prohibited_fields:
+        - learner_identity
+        - learner_submissions
+        - support_details
+        - attendance_detail
+      storage:
+        primary: s3
+        region: ca-central-1
+        encryption: aws_kms
+        versioning: true
+      retention_class: quality_record
+      deletion_trigger: artifact_expiry_or_supersession
+      access_roles:
+        - operator
+        - evidence_reviewer
+
+  provider_boundaries:
+    - provider: aws
+      permitted_data_classes:
+        - enrollment
+        - attendance
+        - support
+        - shared_artifacts
+      prohibited_data_classes:
+        - unapproved_production_customer_data
+      region_record: ca-central-1
+      cross_border_access: controlled
+      training_on_customer_data: not_permitted
+      deletion_route: approved_data_deletion_workflow
+
+    - provider: github
+      permitted_data_classes:
+        - source_code
+        - curriculum_source
+        - public_deidentified_metrics
+      prohibited_data_classes:
+        - enrollment
+        - attendance
+        - support
+        - learner_submissions
+      region_record: provider_contract_record
+      cross_border_access: possible
+      training_on_customer_data: not_permitted
+      deletion_route: repository_correction_and_history_policy
+
+    - provider: google_workspace
+      permitted_data_classes:
+        - shared_artifacts
+        - public_program_documents
+      prohibited_data_classes:
+        - enrollment
+        - attendance_detail
+        - support_details
+        - learner_submissions
+      region_record: provider_contract_record
+      cross_border_access: controlled
+      training_on_customer_data: not_permitted
+      deletion_route: shared_artifact_deletion_workflow
+
+    - provider: model_adapters
+      permitted_data_classes:
+        - public_program_documents
+        - synthetic_lab_data
+        - deidentified_metrics
+      prohibited_data_classes:
+        - enrollment
+        - attendance
+        - support
+        - learner_submissions
+        - credentials
+      region_record: adapter_contract_record
+      cross_border_access: controlled
+      training_on_customer_data: not_permitted
+      deletion_route: adapter_request_deletion_and_key_rotation

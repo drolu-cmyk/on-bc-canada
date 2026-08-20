@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sozorock:on-bc-canada:schema:consent-record:v1",
+  "title": "Learner consent record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "consent_id",
+    "learner_ref",
+    "program_id",
+    "policy_version",
+    "purposes",
+    "status",
+    "captured_at",
+    "source",
+    "region",
+    "privacy_class",
+    "retention_class",
+    "evidence_refs"
+  ],
+  "properties": {
+    "consent_id": {"type": "string", "pattern": "^consent-[A-Za-z0-9._:-]+$"},
+    "learner_ref": {"type": "string", "minLength": 8},
+    "program_id": {"type": "string", "minLength": 3},
+    "policy_version": {"type": "string", "minLength": 1},
+    "purposes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "enrollment",
+          "communications",
+          "attendance",
+          "submissions",
+          "support",
+          "quality_metrics",
+          "certificate_record"
+        ]
+      }
+    },
+    "status": {"enum": ["granted", "withdrawn", "superseded"]},
+    "captured_at": {"type": "string", "format": "date-time"},
+    "withdrawn_at": {"type": "string", "format": "date-time"},
+    "source": {"enum": ["learner", "operator", "automation"]},
+    "region": {"const": "ca-central-1"},
+    "privacy_class": {"const": "learner_private"},
+    "retention_class": {"enum": ["cohort_lifecycle", "credential_record", "quality_record"]},
+    "evidence_refs": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "withdrawn"}}, "required": ["status"]},
+      "then": {"required": ["withdrawn_at"]}
+    }
+  ]
+}

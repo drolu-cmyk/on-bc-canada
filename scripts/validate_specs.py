@@ -82,6 +82,23 @@ def validate_modules():
     return ok
 
 
+def validate_config_instance(instance_path: Path, schema_path: Path) -> bool:
+    instance = load_yaml(instance_path)
+    schema = load_json(schema_path)
+    if Draft202012Validator is None:
+        print(f"OK    {instance_path.relative_to(ROOT)} YAML structure (semantic validation deferred to CI)")
+        return True
+    validator = Draft202012Validator(schema)
+    errors = sorted(validator.iter_errors(instance), key=lambda error: list(error.path))
+    if errors:
+        for error in errors:
+            location = ".".join(str(part) for part in error.path) or "root"
+            print(f"ERROR {instance_path.relative_to(ROOT)} {location}: {error.message}")
+        return False
+    print(f"OK    {instance_path.relative_to(ROOT)}")
+    return True
+
+
 def main() -> int:
     ok = True
     program = load_yaml(ROOT / "config/program.yaml")
@@ -96,6 +113,11 @@ def main() -> int:
         "learner-event.schema.json",
         "provider-adapter.schema.json",
         "release-manifest.schema.json",
+        "consent-record.schema.json",
+        "attendance-record.schema.json",
+        "support-case.schema.json",
+        "automation.schema.json",
+        "data-controls.schema.json",
     ]:
         schema = load_json(ROOT / "schemas" / schema_name)
         if Draft202012Validator is None:
@@ -104,6 +126,8 @@ def main() -> int:
             Draft202012Validator.check_schema(schema)
             print(f"OK    schemas/{schema_name}")
 
+    ok = validate_config_instance(ROOT / "config/automation.yaml", ROOT / "schemas/automation.schema.json") and ok
+    ok = validate_config_instance(ROOT / "config/data-controls.yaml", ROOT / "schemas/data-controls.schema.json") and ok
     ok = validate_modules() and ok
     ok = check_claims() and ok
     return 0 if ok else 1

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sozorock:on-bc-canada:schema:attendance-record:v1",
+  "title": "Learner attendance record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "attendance_id",
+    "learner_ref",
+    "cohort_id",
+    "session_id",
+    "recorded_at",
+    "status",
+    "source",
+    "policy_version",
+    "evidence_refs",
+    "region",
+    "privacy_class",
+    "retention_class"
+  ],
+  "properties": {
+    "attendance_id": {"type": "string", "pattern": "^attendance-[A-Za-z0-9._:-]+$"},
+    "learner_ref": {"type": "string", "minLength": 8},
+    "cohort_id": {"type": "string", "minLength": 3},
+    "session_id": {"type": "string", "minLength": 3},
+    "recorded_at": {"type": "string", "format": "date-time"},
+    "status": {"enum": ["present", "partial", "absent", "alternate_path", "excused", "corrected"]},
+    "source": {"enum": ["virtual_session", "alternate_path", "operator_correction", "automation"]},
+    "policy_version": {"type": "string", "minLength": 1},
+    "evidence_refs": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "region": {"const": "ca-central-1"},
+    "privacy_class": {"const": "learner_private"},
+    "retention_class": {"enum": ["cohort_lifecycle", "credential_record", "quality_record"]},
+    "correction_reason": {"type": "string", "minLength": 3}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "corrected"}}, "required": ["status"]},
+      "then": {"required": ["correction_reason"]}
+    }
+  ]
+}

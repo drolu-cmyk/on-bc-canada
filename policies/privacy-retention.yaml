@@ -1,0 +1,21 @@
+policy:
+  id: learner-privacy-retention
+  version: 0.1.0
+  reference_region: ca-central-1
+  rule: "Collect the smallest record needed for the stated program action, keep it in the approved region, restrict access by role, and delete it through a recorded workflow at retention expiry."
+
+controls:
+  - id: data_minimization
+    requirement: "Use pseudonymous learner references in event payloads and keep direct identity fields outside the event ledger."
+  - id: region_boundary
+    requirement: "Store applicable learner records in AWS Canada Central and record the region on each controlled record."
+  - id: access_boundary
+    requirement: "Expose learner records only to the role required for the current action."
+  - id: provider_boundary
+    requirement: "Do not send enrollment, attendance detail, support details, learner submissions, or credentials to model adapters."
+  - id: sharing_boundary
+    requirement: "Use Google Drive for approved generated artifacts; keep learner identity and detailed learner records in the system of record."
+  - id: retention_boundary
+    requirement: "Attach a retention class and deletion trigger to every controlled record."
+  - id: correction_route
+    requirement: "Record correction, withdrawal, and deletion actions as versioned events with an evidence reference."

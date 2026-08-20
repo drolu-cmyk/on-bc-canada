@@ -1,0 +1,165 @@
+automation:
+  automation_id: standard-learner-path
+  version: 0.1.0
+  mode: disabled
+  reference_region: ca-central-1
+  external_side_effects: disabled
+  workflows:
+    - workflow_id: enrollment-validation
+      trigger:
+        event_type: enrollment.submitted.v1
+        schema_version: "1.0"
+        privacy_class: learner_private
+      steps:
+        - step_id: validate-consent
+          action: consent.validate
+          success_event: enrollment.validated.v1
+          failure_event: human-review.requested.v1
+          retry:
+            max_attempts: 2
+            backoff_seconds: 30
+        - step_id: evaluate-capacity
+          action: cohort.capacity.evaluate
+          success_event: learner.accepted.v1
+          failure_event: learner.waitlisted.v1
+          retry:
+            max_attempts: 2
+            backoff_seconds: 60
+        - step_id: route-outcome
+          action: enrollment.outcome.route
+          success_event: learner.next-action.created.v1
+          failure_event: human-review.requested.v1
+          retry:
+            max_attempts: 2
+            backoff_seconds: 60
+      failure_route:
+        event_type: human-review.requested.v1
+        owner_role: learner_operations_owner
+        reason_field: reason_code
+      human_gate:
+        mode: automated
+        gate_id: routine-routing
+        required_role: learner_operations_owner
+        evidence:
+          - event_record
+          - idempotency_record
+
+    - workflow_id: workspace-onboarding
+      trigger:
+        event_type: learner.accepted.v1
+        schema_version: "1.0"
+        privacy_class: learner_private
+      steps:
+        - step_id: provision-workspace
+          action: workspace.provision
+          success_event: workspace.provisioned.v1
+          failure_event: human-review.requested.v1
+          retry:
+            max_attempts: 3
+            backoff_seconds: 60
+        - step_id: generate-orientation
+          action: orientation.packet.generate
+          success_event: orientation.packet.created.v1
+          failure_event: human-review.requested.v1
+          retry:
+            max_attempts: 2
+            backoff_seconds: 30
+        - step_id: publish-next-action
+          action: learner.next-action.publish
+          success_event: learner.next-action.created.v1
+          failure_event: human-review.requested.v1
+          retry:
+            max_attempts: 2
+            backoff_seconds: 30
+      failure_route:
+        event_type: human-review.requested.v1
+        owner_role: learner_operations_owner
+        reason_field: reason_code
+      human_gate:
+        mode: automated
+        gate_id: routine-routing
+        required_role: learner_operations_owner
+        evidence:
+          - workspace_reference
+          - orientation_reference
+
+    - workflow_id: session-closeout
+      trigger:
+        event_type: session.closed.v1
+        schema_version: "1.0"
+        privacy_class: learner_private
+      steps:
+        - step_id: record-attendance
+          action: attendance.record
+          success_event: attendance.recorded.v1
+          failure_event: human-review.requested.v1
+          retry:
+            max_attempts: 2
+            backoff_seconds: 30
+        - step_id: capture-evidence
+          action: submission.capture
+          success_event: submission.recorded.v1
+          failure_event: human-review.requested.v1
+          retry:
+            max_attempts: 2
+            backoff_seconds: 60
+        - step_id: route-support
+          action: support.route
+          success_event: support.status.updated.v1
+          failure_event: human-review.requested.v1
+          retry:
+            max_attempts: 2
+            backoff_seconds: 60
+      failure_route:
+        event_type: human-review.requested.v1
+        owner_role: safety_and_security_owner
+        reason_field: reason_code
+      human_gate:
+        mode: human_authorized
+        gate_id: safety_incident
+        required_role: safety_and_security_owner
+        evidence:
+          - event_record
+          - containment_action
+          - affected_scope
+
+    - workflow_id: cohort-closeout
+      trigger:
+        event_type: cohort.closeout.requested.v1
+        schema_version: "1.0"
+        privacy_class: learner_private
+      steps:
+        - step_id: calculate-attendance
+          action: attendance.calculate
+          success_event: attendance.summary.created.v1
+          failure_event: human-review.requested.v1
+          retry:
+            max_attempts: 1
+            backoff_seconds: 0
+        - step_id: build-quality-packet
+          action: quality.packet.generate
+          success_event: quality.packet.created.v1
+          failure_event: human-review.requested.v1
+          retry:
+            max_attempts: 2
+            backoff_seconds: 60
+        - step_id: route-external-claim
+          action: claim.review.route
+          success_event: external-claim.reviewed.v1
+          failure_event: human-review.requested.v1
+          retry:
+            max_attempts: 1
+            backoff_seconds: 0
+      failure_route:
+        event_type: human-review.requested.v1
+        owner_role: operator_and_evidence_reviewer
+        reason_field: reason_code
+      human_gate:
+        mode: human_authorized
+        gate_id: external_claim
+        required_role: operator_and_evidence_reviewer
+        evidence:
+          - claim_text
+          - calculation
+          - date_range
+          - limitation_statement
