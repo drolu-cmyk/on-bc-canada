@@ -1,7 +1,7 @@
 release:
-  id: public-readiness-foundation
+  id: controlled-pilot-release
   version: 0.1.0
-  status: controlled_pilot_design
+  status: controlled_pilot
   operator: SozoRock Tech Inc Canada
   program: Applied AI Training for Canada
   public_offer:

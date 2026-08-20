@@ -15,7 +15,6 @@ checks:
   - id: jurisdiction_language
     requirement: "State Ontario as the primary operating posture and Canada-wide virtual delivery; do not imply provincial authorization that has not been reviewed."
   - id: infrastructure_language
-    requirement: "Describe AWS Canada Central as a planned reference region only until the full provider and data-flow inventory is approved."
+    requirement: "Describe AWS Canada Central as the reference region for applicable program data and publish provider and data-flow language from approved records."
   - id: model_language
     requirement: "Describe model providers as replaceable tools; never make the selected model provider part of the learning outcome."
-

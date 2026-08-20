@@ -13,7 +13,7 @@ outcomes:
     level: evaluate
     stable: true
   - id: CC102-O3
-    statement: "Draft a proportionate privacy and data-handling note with purpose, minimization, access, and retention decisions."
+    statement: "Create a proportionate privacy and data-handling note with purpose, minimization, access, and retention decisions."
     level: design
     stable: true
 evidence:
@@ -42,4 +42,3 @@ safe_lab:
   allowed_data: [synthetic_records, public_dataset, authorized_sample]
   prohibited_data: [real_customer_records, government_identifiers, private_health_information]
   stop_conditions: [unknown_personal_information, unapproved_external_upload]
-

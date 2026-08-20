@@ -13,7 +13,7 @@ outcomes:
     level: design
     stable: true
   - id: CC101-O3
-    statement: "Define a measurable problem statement and identify what should not be automated."
+    statement: "Define a measurable problem statement and identify the automation boundaries."
     level: evaluate
     stable: true
 evidence:
@@ -42,4 +42,3 @@ safe_lab:
   allowed_data: [synthetic_workflow, public_process_description]
   prohibited_data: [production_workflow_credentials, confidential_process_details]
   stop_conditions: [unclear_data_authorization, unintended_external_action]
-

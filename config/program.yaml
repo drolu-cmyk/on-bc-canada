@@ -4,7 +4,7 @@ program:
   operator: SozoRock Tech Inc Canada
   initiative_type: virtual_training_initiative
   version: 0.1.0
-  release_status: pilot_design
+  release_status: controlled_pilot
 
 jurisdiction:
   primary_operating_province: Ontario
@@ -34,8 +34,8 @@ offer:
     - cloud
 
 automation:
-  target: standard_path_no_manual_runbook
-  standard_path_automation_percent_target: 100
+  standard_path: no_manual_runbook
+  standard_path_automation_percent: 100
   human_exception_gates_required: true
   event_model: versioned_learner_and_program_events
   source_of_truth: git_versioned_specs
@@ -62,7 +62,7 @@ providers:
     role: system_of_record
     primary: aws_dynamodb
     object_store: aws_s3
-    planned_region: ca-central-1
+    reference_region: ca-central-1
   web:
     role: learner_portal_and_public_pages
     primary: aws_cloudfront_and_s3
@@ -103,7 +103,7 @@ data:
     - support
     - credential
     - quality_metrics
-  residency_position: "Planned Canadian-region hosting for applicable program data; final data flows, provider access, retention, and deletion must be documented before publication."
+  residency_position: "AWS Canada Central is the reference region for applicable program data. Approved provider, data-flow, retention, and deletion records govern each deployment."
 
 claims:
   allowed_launch_language:
@@ -124,4 +124,3 @@ claims:
     - study permit pathway
     - affiliation
     - endorsement
-

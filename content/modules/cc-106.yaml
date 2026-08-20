@@ -31,7 +31,7 @@ delivery:
   weeks: 2
   live_sessions: [communication_seminar, decision_record_studio, stakeholder_defense]
   independent_work: [decision_record, one_page_brief, oral_or_written_defense]
-  accessibility_path: "Learner may submit written, audio, or captioned video explanation using the same rubric."
+  accessibility_path: "Learners can submit a written, audio, or captioned video explanation using the same rubric."
 change_resilience:
   invariant_concepts: [audience_and_purpose, evidence_and_assumptions, limitations, handoff, accountability]
   replaceable_tools: [document_editor, slide_editor, recording_tool]
@@ -42,4 +42,3 @@ safe_lab:
   allowed_data: [synthetic_case, public_source, authorized_project_material]
   prohibited_data: [unapproved_personal_information, confidential_partner_material]
   stop_conditions: [unclear_source_rights, unverified_public_claim, privacy_exposure]
-

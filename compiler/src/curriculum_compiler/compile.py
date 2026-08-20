@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Compile versioned module specifications into a portable release package.
 
-The compiler is intentionally offline and deterministic. Model providers may help
-authors draft source specifications, but they are not part of the release path.
+The compiler is intentionally offline and deterministic. Model providers are
+optional authoring aids; they are not part of the release path.
 """
 
 from __future__ import annotations
@@ -167,7 +167,7 @@ Domain: `{module['domain']}`
 
 {', '.join(resilience['invariant_concepts'])}
 
-The implementation instrument may change. The reasoning, evidence, and review standard remain the same.
+The implementation instrument can change. The reasoning, evidence, and review standard remain the same.
 """
 
 
@@ -238,7 +238,7 @@ def _rubric(module: dict[str, Any], release_id: str) -> dict[str, Any]:
             }
             for outcome in module["outcomes"]
         ],
-        "attendance_certificate_note": "This rubric is internal quality evidence and is separate from a certificate of attendance.",
+        "attendance_certificate_note": "This rubric is quality evidence and is separate from a certificate of attendance.",
     }
 
 

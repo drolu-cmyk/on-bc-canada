@@ -1,10 +1,6 @@
 # Fundable-by-design evidence system
 
-## Fundability thesis
-
-The program becomes fundable when it can show a repeatable public problem, a credible method, safe operations, measurable outputs, meaningful learner outcomes, a cost model, and an improvement loop. Free delivery alone is not a funding case. Evidence of access, quality, transfer, and stewardship is the funding case.
-
-The system should generate a funder-ready package after every cohort instead of writing a new story from memory.
+Fundability rests on a documented public problem, credible instructional method, safe operations, measurable outputs, meaningful learner outcomes, a cost model, and an improvement loop. Free delivery is an access feature. Evidence of access, quality, transfer, and stewardship forms the funding case.
 
 ## Evidence streams
 
@@ -15,11 +11,11 @@ The system should generate a funder-ready package after every cohort instead of 
 | Learning | artifact completion, rubric dimensions, revision rate, learner reflection | submission, review, resubmission events |
 | Quality | accessibility coverage, response time, incident rate, unresolved exceptions | release, support, incident, QA events |
 | Outcomes | confidence change, demonstrated capability, portfolio use, further study, work signal | pre/post surveys and follow-up events |
-| Equity and inclusion | access support delivered, alternative-path use, barrier reduction | support and accessibility events |
+| Equity and inclusion | access support delivered, alternate-path use, barrier reduction | support and accessibility events |
 | Stewardship | cost per learner, in-kind support, cloud cost, instructor time, cost avoided | finance and operations events |
-| Sustainability | partner interest, repeatability, volunteer/instructor pipeline, next-cohort capacity | partner, roster, cohort events |
+| Sustainability | partner interest, repeatability, instructor pipeline, cohort capacity | partner, roster, cohort events |
 
-## Minimum metric definitions
+## Metric definitions
 
 ```yaml
 metrics:
@@ -41,11 +37,11 @@ metrics:
     formula: median(first_response_at - request_received_at)
 ```
 
-Metrics must preserve denominator, date range, cohort, version, exclusions, and limitations. Demographic or sensitive data should not be collected merely to improve a grant chart; collect it only with a defined purpose, voluntary choice, secure handling, and approved reporting logic.
+Metrics preserve denominator, date range, cohort, version, exclusions, and limitations. Demographic or sensitive data enters the system only with a defined purpose, voluntary choice, secure handling, and approved reporting logic.
 
-## Automatically generated funder package
+## Cohort evidence package
 
-After a cohort closes, the system should generate:
+Cohort closeout generates:
 
 1. one-page impact brief;
 2. theory of change and logic model;
@@ -55,12 +51,12 @@ After a cohort closes, the system should generate:
 6. anonymized learner artifacts or sample evidence;
 7. quality, safety, privacy, and incident summary;
 8. budget, cost-per-learner, and in-kind contribution table;
-9. sustainability and scale plan;
+9. continuity and scale model;
 10. versioned data dictionary and methodology note;
 11. operator, governance, and contact sheet;
 12. evidence index for a read-only Google Drive data room.
 
-## Funding pathways to design for
+## Funding pathways
 
 - philanthropic grants for access, equity, digital skills, and workforce readiness;
 - corporate sponsorship for responsible AI, cybersecurity, cloud literacy, and talent development;
@@ -69,11 +65,11 @@ After a cohort closes, the system should generate:
 - research, evaluation, or demonstration partnerships;
 - in-kind credits, cloud support, subject-matter experts, and accessibility services.
 
-The system should not change its educational claims to fit a funder. It should produce different views of the same verified evidence for different funder priorities.
+Educational claims remain stable across funder audiences. The evidence system produces audience-specific views of verified records.
 
 ## Funder data-room controls
 
-Every shared item needs:
+Every shared item carries:
 
 - approved audience;
 - privacy class;
@@ -85,5 +81,4 @@ Every shared item needs:
 - redaction/de-identification status;
 - claim limitations.
 
-Google Drive can be the convenient sharing layer. S3/versioned evidence objects and the repository remain the durable archive. A revoked or expired link should be recorded as an event, not treated as an informal cleanup task.
-
+Google Drive provides the sharing layer. S3/versioned evidence objects and the repository remain the durable archive. A revoked or expired link becomes an event in the evidence ledger.

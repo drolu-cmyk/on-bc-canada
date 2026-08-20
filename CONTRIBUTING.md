@@ -1,11 +1,11 @@
-# Contributing and release rules
+# Contribution and release rules
 
 ## Before changing files
 
-1. Read `PROJECT_CONTEXT.md`.
-2. Identify the bounded workstream and its write scope.
+1. Read `PROGRAM_CHARTER.md`.
+2. Identify the capability domain and file scope.
 3. Check whether the change affects public claims, learner privacy, accessibility, safety, credentials, or jurisdiction.
-4. Add or update the relevant schema, policy, test, and evidence record before adding implementation complexity.
+4. Add or update the relevant schema, policy, test, and evidence record with the implementation change.
 
 ## Branches
 
@@ -13,7 +13,7 @@ Create a feature branch from `main`. Use a single scope in the branch name. Keep
 
 ## Commits
 
-Commits are small, atomic, and reversible. A commit should represent one reviewable decision. Do not use blanket staging commands. Stage confirmed paths only.
+Commits are small, atomic, and reversible. Each commit represents one reviewable decision. Do not use blanket staging commands. Stage confirmed paths only.
 
 Every commit message uses the format:
 
@@ -23,7 +23,7 @@ Every commit message uses the format:
 
 ## Pull requests
 
-Open one draft pull request for the public-readiness foundation. The pull request must contain:
+Each pull request contains:
 
 - summary of the bounded change;
 - files changed;
@@ -31,7 +31,7 @@ Open one draft pull request for the public-readiness foundation. The pull reques
 - privacy/security/accessibility impact;
 - claims impact;
 - rollback or correction path;
-- follow-on work that is intentionally not included.
+- scope boundaries and excluded changes.
 
 ## Required checks
 
@@ -48,4 +48,3 @@ Open one draft pull request for the public-readiness foundation. The pull reques
 ## Release gates
 
 Do not publish learner-facing material until the content-release gate is approved. Do not issue a credential until the credential gate has the required attendance evidence. Do not share a funder package until the external-claim gate has verified calculations, limitations, audience, and privacy class.
-

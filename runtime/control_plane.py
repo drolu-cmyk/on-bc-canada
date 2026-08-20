@@ -1,8 +1,8 @@
 """Provider-neutral enrollment-to-onboarding control-plane slice.
 
-This module is a local contract reference for the future AWS implementation. It
-uses immutable event dictionaries and an idempotency index so the same behavior
-can be exercised without cloud credentials or learner data.
+This module is a local contract reference for AWS implementations. It uses
+immutable event dictionaries and an idempotency index so the same behavior can
+be exercised without cloud credentials or learner data.
 """
 
 from __future__ import annotations

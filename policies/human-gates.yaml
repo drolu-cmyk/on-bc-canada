@@ -1,7 +1,7 @@
 policy:
   id: human-gates
   version: 0.1.0
-  purpose: "Automate routing and evidence collection while preserving accountable decisions where a system should not decide alone."
+  purpose: "Automate routing and evidence collection while preserving accountable human decisions for safety, fairness, and responsibility."
 
 gates:
   - id: content_release
@@ -56,4 +56,3 @@ gates:
       - calculation
       - date_range
       - limitation_statement
-
