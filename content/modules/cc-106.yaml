@@ -1,0 +1,45 @@
+module_id: CC-106
+title: Professional Practice and Technical Communication
+version: 0.1.0
+domain: common_core
+description: "Turn technical and governance reasoning into clear records that another person can review and act on."
+outcomes:
+  - id: CC106-O1
+    statement: "Write a decision record that states purpose, assumptions, evidence, tradeoffs, limitations, and next action."
+    level: design
+    stable: true
+  - id: CC106-O2
+    statement: "Explain a technical or risk decision to technical, operational, executive, and public-interest audiences."
+    level: defend
+    stable: true
+  - id: CC106-O3
+    statement: "Disclose assistance, sources, uncertainty, and unresolved limitations in a professional handoff."
+    level: evaluate
+    stable: true
+evidence:
+  - artifact_id: CC106-A1
+    type: memo
+    maps_to_outcomes: [CC106-O1, CC106-O3]
+    rubric_id: CC106-R1
+    required_for_certificate: false
+  - artifact_id: CC106-A2
+    type: presentation
+    maps_to_outcomes: [CC106-O1, CC106-O2]
+    rubric_id: CC106-R2
+    required_for_certificate: false
+delivery:
+  weeks: 2
+  live_sessions: [communication_seminar, decision_record_studio, stakeholder_defense]
+  independent_work: [decision_record, one_page_brief, oral_or_written_defense]
+  accessibility_path: "Learner may submit written, audio, or captioned video explanation using the same rubric."
+change_resilience:
+  invariant_concepts: [audience_and_purpose, evidence_and_assumptions, limitations, handoff, accountability]
+  replaceable_tools: [document_editor, slide_editor, recording_tool]
+  substitution_test: "A handoff remains reviewable when moved between document, slide, audio, and plain-text formats."
+  refresh_triggers: [repeated_misunderstanding, accessibility_feedback, policy_or_claims_change]
+standards_map: [quality.communication, governance.accountability, accessibility.multiple_formats]
+safe_lab:
+  allowed_data: [synthetic_case, public_source, authorized_project_material]
+  prohibited_data: [unapproved_personal_information, confidential_partner_material]
+  stop_conditions: [unclear_source_rights, unverified_public_claim, privacy_exposure]
+
