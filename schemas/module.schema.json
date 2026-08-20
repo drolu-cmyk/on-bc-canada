@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sozorock.example/schemas/module.schema.json",
+  "$id": "urn:sozorock:on-bc-canada:schema:module:v1",
   "title": "Applied AI Training for Canada module specification",
   "type": "object",
   "additionalProperties": false,

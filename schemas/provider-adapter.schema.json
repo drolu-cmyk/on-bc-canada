@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sozorock.example/schemas/provider-adapter.schema.json",
+  "$id": "urn:sozorock:on-bc-canada:schema:provider-adapter:v1",
   "title": "Portable provider adapter contract",
   "type": "object",
   "additionalProperties": false,

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sozorock.example/schemas/learner-event.schema.json",
+  "$id": "urn:sozorock:on-bc-canada:schema:learner-event:v1",
   "title": "Learner and program event",
   "type": "object",
   "additionalProperties": false,

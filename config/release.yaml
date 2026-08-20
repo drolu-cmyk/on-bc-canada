@@ -1,0 +1,48 @@
+release:
+  id: public-readiness-foundation
+  version: 0.1.0
+  status: controlled_pilot_design
+  operator: SozoRock Tech Inc Canada
+  program: Applied AI Training for Canada
+  public_offer:
+    tuition_cad: 0
+    delivery: 100_percent_virtual
+    scope: Canada-wide
+    credential: certificate_of_attendance_only
+  automatic_checks:
+    - source_specification_schema
+    - outcome_evidence_traceability
+    - compiler_determinism
+    - provider_neutral_outcomes
+    - safe_lab_boundaries
+    - claims_scan
+    - event_contracts
+    - secret_scan
+    - link_and_asset_health
+    - accessibility_path_presence
+  required_evidence:
+    - release_manifest
+    - source_digest
+    - validation_report
+    - accessibility_report
+    - data_flow_register
+    - privacy_and_retention_decision
+    - safe_lab_acceptance_report
+    - provider_substitution_report
+    - synthetic_cohort_replay
+    - rollback_or_supersession_record
+  human_gates:
+    - content_release
+    - safety_incident
+    - assessment_exception
+    - credential_issue
+    - policy_change
+    - external_claim
+  publication_rules:
+    - no learner_records_in_public_artifacts
+    - no secrets_or_provider_tokens_in_source_control
+    - no accreditation_or_certification_claim
+    - no degree_diploma_or_licensing_claim
+    - no employment_or_immigration_outcome_claim
+    - no provider_affiliation_claim_without_approved_evidence
+    - no production_data_in_learner_labs
