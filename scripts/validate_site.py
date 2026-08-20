@@ -9,7 +9,8 @@ from pathlib import Path
 
 
 SITE = Path("site")
-REQUIRED_PAGES = {
+CANONICAL_ORIGIN = "https://www.sozorock.ca"
+CONTENT_PAGES = {
     "index.html",
     "program.html",
     "curriculum.html",
@@ -18,8 +19,12 @@ REQUIRED_PAGES = {
     "support.html",
     "privacy.html",
     "terms.html",
-    "404.html",
 }
+REQUIRED_PAGES = CONTENT_PAGES | {"404.html"}
+
+
+def canonical_path(page_name: str) -> str:
+    return "/" if page_name == "index.html" else f"/{page_name}"
 
 
 def main() -> int:
@@ -45,6 +50,19 @@ def main() -> int:
         if path.name != "404.html" and 'href="#main"' not in source:
             errors.append(f"{path}: missing skip link")
 
+        if path.name in CONTENT_PAGES:
+            expected_url = f"{CANONICAL_ORIGIN}{canonical_path(path.name)}"
+            required_metadata = (
+                f'<link rel="canonical" href="{expected_url}">',
+                f'<meta property="og:url" content="{expected_url}">',
+                '<meta name="twitter:card" content="summary">',
+            )
+            for required in required_metadata:
+                if required not in source:
+                    errors.append(f"{path}: missing {required}")
+        elif '<meta name="robots" content="noindex">' not in source:
+            errors.append(f"{path}: missing noindex directive")
+
         for target in re.findall(r'(?:href|src)="([^"]+)"', source):
             if target.startswith(("http:", "https:", "#", "mailto:")):
                 continue
@@ -54,8 +72,24 @@ def main() -> int:
 
     if not (SITE / "styles.css").is_file():
         errors.append("site/styles.css is missing")
-    if not (SITE / "robots.txt").is_file():
+    robots_path = SITE / "robots.txt"
+    if not robots_path.is_file():
         errors.append("site/robots.txt is missing")
+    else:
+        robots = robots_path.read_text(encoding="utf-8")
+        sitemap_url = f"Sitemap: {CANONICAL_ORIGIN}/sitemap.xml"
+        if sitemap_url not in robots:
+            errors.append(f"site/robots.txt: missing {sitemap_url}")
+
+    sitemap_path = SITE / "sitemap.xml"
+    if not sitemap_path.is_file():
+        errors.append("site/sitemap.xml is missing")
+    else:
+        sitemap = sitemap_path.read_text(encoding="utf-8")
+        for page_name in sorted(CONTENT_PAGES):
+            expected_url = f"<loc>{CANONICAL_ORIGIN}{canonical_path(page_name)}</loc>"
+            if expected_url not in sitemap:
+                errors.append(f"site/sitemap.xml: missing {expected_url}")
 
     if errors:
         print("Static site validation failed:", file=sys.stderr)
