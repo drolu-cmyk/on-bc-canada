@@ -31,6 +31,7 @@ The program publishes only claims supported by current records. Participation is
 
 - [Program charter](PROGRAM_CHARTER.md)
 - [Capability domains](CAPABILITY_DOMAINS.md)
+- [Public information shell](site/index.html)
 - [Contribution and release rules](CONTRIBUTING.md)
 - [Program architecture](docs/program-architecture.md)
 - [Automation capabilities](docs/automation-capabilities.md)
@@ -45,6 +46,7 @@ Run from the repository root:
 ```bash
 python scripts/validate_specs.py
 python scripts/validate_public_copy.py
+python scripts/validate_site.py
 PYTHONPATH=compiler/src python -m unittest discover -s compiler/tests -v
 python -m unittest discover -s runtime -p 'test_*.py' -v
 ```
