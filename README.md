@@ -16,9 +16,10 @@ Public-readiness foundation for a free, 100% virtual, Canada-wide training initi
 1. Read [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md).
 2. Read [`CONTRIBUTING.md`](CONTRIBUTING.md).
 3. Review the [19 workstreams](WORKSTREAMS.md).
-4. Run `python scripts/validate_specs.py` after installing `pyyaml` and `jsonschema`.
-5. Run `PYTHONPATH=compiler/src python -m unittest discover -s compiler/tests -v`.
-6. Run `python -m unittest discover -s runtime -p 'test_*.py' -v`.
-7. Review `docs/mvp-backlog.md` before adding platform features.
+4. Read the [lead workstream synthesis](docs/workstream-synthesis.md).
+5. Run `python scripts/validate_specs.py` after installing `pyyaml` and `jsonschema`.
+6. Run `PYTHONPATH=compiler/src python -m unittest discover -s compiler/tests -v`.
+7. Run `python -m unittest discover -s runtime -p 'test_*.py' -v`.
+8. Review `docs/mvp-backlog.md` before adding platform features.
 
 This repository is a training and automation foundation. It does not claim accreditation, certification, endorsement, licensing, immigration eligibility, employment outcomes, or affiliation without an approved evidence record.
