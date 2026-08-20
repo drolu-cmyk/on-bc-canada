@@ -1,0 +1,44 @@
+module_id: AAI-102
+title: "Applied AI Practicum: Workflow to Evidence"
+version: 0.1.0
+domain: applied_ai
+description: "Defend a complete applied AI decision from problem framing through evaluation, oversight, and operation."
+outcomes:
+  - id: AAI102-O1
+    statement: "Integrate problem, data, architecture, evaluation, oversight, and operations into one applied AI dossier."
+    level: design
+    stable: true
+  - id: AAI102-O2
+    statement: "Defend assumptions, limitations, safety boundaries, provider substitutions, and evidence traceability."
+    level: defend
+    stable: true
+  - id: AAI102-O3
+    statement: "Revise the dossier from critique and demonstrate a stable decision record across a changed tool."
+    level: evaluate
+    stable: true
+evidence:
+  - artifact_id: AAI102-A1
+    type: portfolio
+    maps_to_outcomes: ["AAI102-O1","AAI102-O3"]
+    rubric_id: AAI102-R1
+    required_for_certificate: false
+  - artifact_id: AAI102-A2
+    type: oral_defense
+    maps_to_outcomes: ["AAI102-O2","AAI102-O3"]
+    rubric_id: AAI102-R2
+    required_for_certificate: false
+delivery:
+  weeks: 2
+  live_sessions: ["applied_ai_studio","cross_domain_critique","evidence_defense"]
+  independent_work: ["applied_ai_dossier","peer_critique_record","revision_and_defense"]
+  accessibility_path: "Portfolio, written defense, audio defense, or captioned video use the same evidence standard."
+change_resilience:
+  invariant_concepts: ["problem_to_operation_trace","evidence_integrity","human_accountability","tool_substitution"]
+  replaceable_tools: ["document_editor","diagram_editor","model_provider"]
+  substitution_test: "Learners defend the same dossier after replacing the named model or authoring tool with a deterministic alternative."
+  refresh_triggers: ["provider_change","new_risk_evidence","critique_pattern","policy_change"]
+standards_map: ["ai.lifecycle","quality.evidence_traceability","governance.accountability"]
+safe_lab:
+  allowed_data: ["synthetic_case","public_reference_material","mock_provider"]
+  prohibited_data: ["real_customer_data","production_deployment","unapproved_external_contact"]
+  stop_conditions: ["missing_human_owner","unresolved_high_risk_decision","incomplete_evidence_chain"]

@@ -1,0 +1,44 @@
+module_id: CLO-102
+title: "Cloud Architecture Practicum: Secure, Portable Workloads"
+version: 0.1.0
+domain: cloud
+description: "Defend a resilient, secure, portable, and evidence-backed cloud architecture."
+outcomes:
+  - id: CLO102-O1
+    statement: "Integrate architecture, identity, network, data protection, change, observability, cost, and assurance."
+    level: design
+    stable: true
+  - id: CLO102-O2
+    statement: "Defend service boundaries, recovery choices, provider substitutions, control evidence, and operational ownership."
+    level: defend
+    stable: true
+  - id: CLO102-O3
+    statement: "Revise the architecture after critique and demonstrate behavior under a changed provider or failure condition."
+    level: evaluate
+    stable: true
+evidence:
+  - artifact_id: CLO102-A1
+    type: portfolio
+    maps_to_outcomes: ["CLO102-O1","CLO102-O3"]
+    rubric_id: CLO102-R1
+    required_for_certificate: false
+  - artifact_id: CLO102-A2
+    type: oral_defense
+    maps_to_outcomes: ["CLO102-O2","CLO102-O3"]
+    rubric_id: CLO102-R2
+    required_for_certificate: false
+delivery:
+  weeks: 2
+  live_sessions: ["cloud_practicum_studio","failure_and_cost_critique","architecture_defense"]
+  independent_work: ["cloud_architecture_dossier","resilience_scenario","revised_architecture"]
+  accessibility_path: "Portfolio, written defense, audio defense, or captioned video use the same evidence standard."
+change_resilience:
+  invariant_concepts: ["architecture_integrity","security_boundary","resilience","provider_portability"]
+  replaceable_tools: ["architecture_editor","configuration_editor","cloud_documentation"]
+  substitution_test: "Learners defend the architecture with diagrams, tables, and local configurations when a provider changes."
+  refresh_triggers: ["provider_change","region_change","failure_scenario","cost_signal"]
+standards_map: ["cloud.architecture","quality.evidence_traceability","security.resilience"]
+safe_lab:
+  allowed_data: ["synthetic_workload","local_emulator","public_provider_documentation"]
+  prohibited_data: ["production_account","real_credentials","unapproved_external_deployment"]
+  stop_conditions: ["unbounded_data_transfer","missing_recovery_path","unsupported_security_claim"]
