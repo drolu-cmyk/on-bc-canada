@@ -1,0 +1,21 @@
+policy:
+  id: public-claims
+  version: 0.1.0
+  rule: "Every external claim must be traceable to an approved source, evidence record, or current official requirement."
+
+checks:
+  - id: operator_identity
+    requirement: "Use the exact operator name: SozoRock Tech Inc Canada."
+  - id: program_status
+    requirement: "Describe the launch offer as a training initiative and certificate-of-attendance program."
+  - id: external_relationships
+    requirement: "Do not imply affiliation, endorsement, accreditation, licensing, partnership, or authorization without a signed and approved record."
+  - id: outcome_language
+    requirement: "Use observed outcomes and limitations; do not convert participation into a competency or employment claim."
+  - id: jurisdiction_language
+    requirement: "State Ontario as the primary operating posture and Canada-wide virtual delivery; do not imply provincial authorization that has not been reviewed."
+  - id: infrastructure_language
+    requirement: "Describe AWS Canada Central as a planned reference region only until the full provider and data-flow inventory is approved."
+  - id: model_language
+    requirement: "Describe model providers as replaceable tools; never make the selected model provider part of the learning outcome."
+

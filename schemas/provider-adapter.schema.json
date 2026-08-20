@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sozorock.example/schemas/provider-adapter.schema.json",
+  "title": "Portable provider adapter contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["adapter_id", "role", "contract_version", "capabilities", "data_controls", "health_check"],
+  "properties": {
+    "adapter_id": {"type": "string"},
+    "role": {"enum": ["model", "workflow", "storage", "collaboration", "communication", "identity", "credential", "analytics"]},
+    "provider_name": {"type": "string"},
+    "contract_version": {"type": "string"},
+    "capabilities": {"type": "array", "items": {"type": "string"}},
+    "data_controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["region", "retention_supported", "deletion_supported", "audit_supported"],
+      "properties": {
+        "region": {"type": "string"},
+        "cross_border_access_possible": {"type": "boolean"},
+        "training_on_customer_data": {"enum": ["unknown", "not_permitted", "configurable", "permitted"]},
+        "retention_supported": {"type": "boolean"},
+        "deletion_supported": {"type": "boolean"},
+        "audit_supported": {"type": "boolean"}
+      }
+    },
+    "health_check": {"type": "string"},
+    "substitution_test": {"type": "string"}
+  }
+}
