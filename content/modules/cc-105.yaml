@@ -1,0 +1,45 @@
+module_id: CC-105
+title: AI Systems Foundations
+version: 0.1.0
+domain: common_core
+description: "Understand the difference between a model, an AI-enabled application, a workflow, and an operating system around it."
+outcomes:
+  - id: CC105-O1
+    statement: "Distinguish models, prompts, context, retrieval, tools, workflows, agents, and human decisions in an AI system."
+    level: explain
+    stable: true
+  - id: CC105-O2
+    statement: "Design an AI-enabled workflow with evaluation cases, human review points, permissions, and stop conditions."
+    level: design
+    stable: true
+  - id: CC105-O3
+    statement: "Evaluate generated output for quality, uncertainty, safety, privacy, and operational usefulness."
+    level: evaluate
+    stable: true
+evidence:
+  - artifact_id: CC105-A1
+    type: diagram
+    maps_to_outcomes: [CC105-O1, CC105-O2]
+    rubric_id: CC105-R1
+    required_for_certificate: false
+  - artifact_id: CC105-A2
+    type: evaluation_report
+    maps_to_outcomes: [CC105-O2, CC105-O3]
+    rubric_id: CC105-R2
+    required_for_certificate: false
+delivery:
+  weeks: 2
+  live_sessions: [ai_systems_seminar, evaluation_lab, human_oversight_case]
+  independent_work: [ai_system_dossier, test_set, limitation_note]
+  accessibility_path: "Text-first evaluation template with captioned demonstration and non-live alternative."
+change_resilience:
+  invariant_concepts: [purpose_and_scope, context_and_provenance, evaluation, human_oversight, stop_conditions]
+  replaceable_tools: [model_provider, prompt_editor, retrieval_stack, agent_runtime]
+  substitution_test: "The same evaluation and oversight plan must work when the named model or platform is replaced."
+  refresh_triggers: [model_capability_change, provider_policy_change, incident, new_misuse_pattern]
+standards_map: [ai.lifecycle_risk, ai.evaluation, security.prompt_and_tool_boundaries]
+safe_lab:
+  allowed_data: [synthetic_cases, public_documents, authorized_content]
+  prohibited_data: [personal_information, confidential_documents, production_credentials]
+  stop_conditions: [unverified_high_impact_output, data_exposure, unauthorized_tool_action]
+

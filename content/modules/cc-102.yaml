@@ -1,0 +1,44 @@
+module_id: CC-102
+title: Data, Evidence, and Privacy
+version: 0.1.0
+domain: common_core
+description: "Understand how data moves, gains or loses trust, and creates privacy obligations."
+outcomes:
+  - id: CC102-O1
+    statement: "Describe a data lifecycle including collection, use, access, transformation, retention, sharing, and deletion."
+    level: explain
+    stable: true
+  - id: CC102-O2
+    statement: "Assess data provenance, quality, classification, and fitness for a defined decision or AI use."
+    level: evaluate
+    stable: true
+  - id: CC102-O3
+    statement: "Create a proportionate privacy and data-handling note with purpose, minimization, access, and retention decisions."
+    level: design
+    stable: true
+evidence:
+  - artifact_id: CC102-A1
+    type: diagram
+    maps_to_outcomes: [CC102-O1]
+    rubric_id: CC102-R1
+    required_for_certificate: false
+  - artifact_id: CC102-A2
+    type: memo
+    maps_to_outcomes: [CC102-O2, CC102-O3]
+    rubric_id: CC102-R2
+    required_for_certificate: false
+delivery:
+  weeks: 2
+  live_sessions: [data_lifecycle_seminar, evidence_quality_lab, privacy_case_conference]
+  independent_work: [data_inventory, provenance_note, privacy_memo]
+  accessibility_path: "Structured table template with plain-language prompts and screen-reader-friendly export."
+change_resilience:
+  invariant_concepts: [purpose_limitation, minimization, provenance, data_quality, retention]
+  replaceable_tools: [spreadsheet, catalog_tool, cloud_storage]
+  substitution_test: "A learner must explain the data decision without relying on a named vendor or database interface."
+  refresh_triggers: [provider_data_flow_change, privacy_rule_change, repeated_unsafe_data_submission]
+standards_map: [privacy.data_minimization, quality.evidence_provenance, security.data_classification]
+safe_lab:
+  allowed_data: [synthetic_records, public_dataset, authorized_sample]
+  prohibited_data: [real_customer_records, government_identifiers, private_health_information]
+  stop_conditions: [unknown_personal_information, unapproved_external_upload]

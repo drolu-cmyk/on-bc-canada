@@ -1,0 +1,58 @@
+policy:
+  id: human-gates
+  version: 0.1.0
+  purpose: "Automate routing and evidence collection while preserving accountable human decisions for safety, fairness, and responsibility."
+
+gates:
+  - id: content_release
+    trigger: curriculum_or_public_copy_change
+    required_role: academic_quality_owner
+    evidence:
+      - changed_spec
+      - outcome_alignment_report
+      - accessibility_report
+      - claims_report
+      - release_decision
+  - id: safety_incident
+    trigger: privacy_security_or_harm_signal
+    required_role: safety_and_security_owner
+    evidence:
+      - event_record
+      - containment_action
+      - affected_scope
+      - remediation_decision
+      - learner_communication_if_required
+  - id: assessment_exception
+    trigger: appeal_identity_or_integrity_exception
+    required_role: assessment_reviewer
+    evidence:
+      - submitted_artifact
+      - rubric_version
+      - learner_statement
+      - review_decision
+      - learner_notification
+  - id: credential_issue
+    trigger: attendance_or_completion_threshold_reached
+    required_role: credential_authorizer
+    evidence:
+      - attendance_events
+      - participation_policy_version
+      - learner_name_confirmation
+      - credential_record
+  - id: policy_change
+    trigger: legal_regulatory_privacy_or_provider_change
+    required_role: operator
+    evidence:
+      - change_source
+      - impact_assessment
+      - revised_policy
+      - communication_plan
+  - id: external_claim
+    trigger: funder_partner_public_or_accreditation_submission
+    required_role: operator_and_evidence_reviewer
+    evidence:
+      - claim_text
+      - source_event_or_document
+      - calculation
+      - date_range
+      - limitation_statement

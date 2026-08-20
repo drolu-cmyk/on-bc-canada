@@ -1,0 +1,126 @@
+program:
+  id: applied-ai-training-canada
+  name: Applied AI Training for Canada
+  operator: SozoRock Tech Inc Canada
+  initiative_type: virtual_training_initiative
+  version: 0.1.0
+  release_status: controlled_pilot
+
+jurisdiction:
+  primary_operating_province: Ontario
+  regional_contexts:
+    - British Columbia
+  delivery_scope: Canada-wide
+  delivery_mode: 100_percent_virtual
+  operator_location: United States
+  jurisdiction_review_required_before:
+    - charging_tuition
+    - offering_a_stronger_credential
+    - using_degree_or_diploma_language
+    - offering_in_person_delivery
+    - advertising_immigration_or_study_permit_outcomes
+    - applying_for_regulated_training_designation
+
+offer:
+  tuition_cad: 0
+  credential_type: certificate_of_attendance
+  credential_claim: participation_only
+  duration_weeks: 12
+  learner_effort_hours_per_week: "3-6 independent hours plus scheduled virtual sessions"
+  domains:
+    - applied_ai
+    - cybersecurity_grc
+    - ai_governance
+    - cloud
+
+automation:
+  standard_path: no_manual_runbook
+  standard_path_automation_percent: 100
+  human_exception_gates_required: true
+  event_model: versioned_learner_and_program_events
+  source_of_truth: git_versioned_specs
+  generated_outputs:
+    - learner_pages
+    - instructor_run_of_show
+    - lab_briefs
+    - assessment_rubrics
+    - attendance_status
+    - certificate_records
+    - quality_reports
+    - funder_reports
+
+providers:
+  workflow:
+    role: workflow_orchestrator
+    primary: aws_step_functions
+    event_bus: aws_eventbridge
+    queue: aws_sqs
+  compute:
+    role: serverless_compute
+    primary: aws_lambda
+  data:
+    role: system_of_record
+    primary: aws_dynamodb
+    object_store: aws_s3
+    reference_region: ca-central-1
+  web:
+    role: learner_portal_and_public_pages
+    primary: aws_cloudfront_and_s3
+  collaboration:
+    role: learner_and_funder_sharing
+    primary: google_drive
+  communication:
+    role: email_and_calendar
+    primary: google_workspace
+  models:
+    role: replaceable_reasoning_and_generation_provider
+    preferred:
+      - codex
+      - grok
+      - google_models
+    routing_contract: schemas/provider-adapter.schema.json
+  source_control:
+    role: versioned_source_of_truth
+    primary: github
+
+data:
+  permitted_lab_inputs:
+    - synthetic
+    - public
+    - explicitly_authorized
+  prohibited_lab_inputs:
+    - production_credentials
+    - private_keys
+    - personal_information_without_approved_controlled_exercise
+    - confidential_business_information
+    - real_customer_records
+  learner_record_classes:
+    - enrollment
+    - communications
+    - attendance
+    - submissions
+    - feedback
+    - support
+    - credential
+    - quality_metrics
+  residency_position: "AWS Canada Central is the reference region for applicable program data. Approved provider, data-flow, retention, and deletion records govern each deployment."
+
+claims:
+  allowed_launch_language:
+    - free
+    - virtual
+    - Canada-wide
+    - training initiative
+    - certificate of attendance
+    - participation record
+  prohibited_without_approved_evidence:
+    - accredited
+    - degree
+    - diploma
+    - licensed
+    - certified professional
+    - employment guarantee
+    - immigration pathway
+    - study permit pathway
+    - affiliation
+    - endorsement

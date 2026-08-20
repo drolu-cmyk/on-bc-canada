@@ -1,0 +1,44 @@
+module_id: CC-101
+title: Systems Thinking for Digital Work
+version: 0.1.0
+domain: common_core
+description: "Frame a problem as a system before selecting an AI, security, or cloud intervention."
+outcomes:
+  - id: CC101-O1
+    statement: "Identify system boundaries, actors, incentives, constraints, and decision points in an organizational workflow."
+    level: analyze
+    stable: true
+  - id: CC101-O2
+    statement: "Construct a system map that makes data, decisions, dependencies, and failure points visible."
+    level: design
+    stable: true
+  - id: CC101-O3
+    statement: "Define a measurable problem statement and identify the automation boundaries."
+    level: evaluate
+    stable: true
+evidence:
+  - artifact_id: CC101-A1
+    type: brief
+    maps_to_outcomes: [CC101-O1, CC101-O3]
+    rubric_id: CC101-R1
+    required_for_certificate: false
+  - artifact_id: CC101-A2
+    type: diagram
+    maps_to_outcomes: [CC101-O1, CC101-O2]
+    rubric_id: CC101-R2
+    required_for_certificate: false
+delivery:
+  weeks: 2
+  live_sessions: [concept_seminar, system_mapping_studio, case_debrief]
+  independent_work: [problem_brief, system_map, reflection]
+  accessibility_path: "Accessible diagram template plus written or audio explanation."
+change_resilience:
+  invariant_concepts: [system_boundary, actors_and_incentives, feedback_loops, failure_modes]
+  replaceable_tools: [diagram_editor, whiteboard, ticketing_system]
+  substitution_test: "A learner must complete the outcome using a diagram or a structured table if the named tool is unavailable."
+  refresh_triggers: [repeated_learner_confusion, new_workflow_pattern, unsafe_automation_pattern]
+standards_map: [quality.learning_outcomes, risk.system_boundary, accessibility.multiple_formats]
+safe_lab:
+  allowed_data: [synthetic_workflow, public_process_description]
+  prohibited_data: [production_workflow_credentials, confidential_process_details]
+  stop_conditions: [unclear_data_authorization, unintended_external_action]

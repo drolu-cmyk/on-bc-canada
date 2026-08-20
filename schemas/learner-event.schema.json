@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sozorock:on-bc-canada:schema:learner-event:v1",
+  "title": "Learner and program event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "event_type", "occurred_at", "program_id", "schema_version", "producer", "actor", "correlation_id", "idempotency_key", "payload", "privacy_class", "retention_class"],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 8},
+    "event_type": {"type": "string", "pattern": "^[a-z0-9_.-]+$"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "program_id": {"type": "string"},
+    "cohort_id": {"type": "string"},
+    "learner_id": {"type": "string"},
+    "schema_version": {"type": "string"},
+    "producer": {"type": "string", "minLength": 2},
+    "aggregate_type": {"type": "string"},
+    "aggregate_id": {"type": "string"},
+    "aggregate_revision": {"type": "integer", "minimum": 1},
+    "correlation_id": {"type": "string", "minLength": 8},
+    "causation_id": {"type": "string", "minLength": 8},
+    "idempotency_key": {"type": "string", "minLength": 8},
+    "policy_version": {"type": "string"},
+    "region": {"type": "string"},
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": {"enum": ["learner", "instructor", "automation", "operator", "external_system"]},
+        "id": {"type": "string"}
+      }
+    },
+    "payload": {"type": "object"},
+    "evidence_refs": {"type": "array", "items": {"type": "string"}},
+    "privacy_class": {"enum": ["operational", "learner_private", "sensitive_support", "public_deidentified"]},
+    "retention_class": {"enum": ["short", "cohort_lifecycle", "credential_record", "quality_record"]},
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "previous_event_hash": {"type": "string"},
+        "event_hash": {"type": "string"},
+        "signing_key_id": {"type": "string"}
+      }
+    }
+  }
+}
