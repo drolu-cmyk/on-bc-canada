@@ -185,3 +185,147 @@ class EnrollmentControlPlane:
                 occurred_at=occurred_at,
             )
         return self.ledger.events[start:]
+
+    def record_consent(
+        self,
+        *,
+        consent_id: str,
+        learner_ref: str,
+        cohort_id: str,
+        purposes: list[str],
+        status: str,
+        policy_version: str,
+        evidence_ref: str,
+        occurred_at: str = "2026-01-01T00:00:00Z",
+    ) -> dict[str, Any]:
+        """Record a consent state without placing direct identity in the event."""
+
+        if status not in {"granted", "withdrawn", "superseded"}:
+            raise ValueError("unsupported consent status")
+        event_type = f"consent.{status}.v1"
+        return self.ledger.append(
+            event_type=event_type,
+            program_id=self.program_id,
+            producer="consent",
+            actor_id="consent-automation",
+            correlation_id=f"corr-{consent_id}",
+            idempotency_key=f"consent:{consent_id}:{status}",
+            payload={
+                "consent_id": consent_id,
+                "purposes": sorted(set(purposes)),
+                "policy_version": policy_version,
+                "status": status,
+                "evidence_ref": evidence_ref,
+            },
+            privacy_class="learner_private",
+            retention_class="cohort_lifecycle",
+            learner_id=learner_ref,
+            cohort_id=cohort_id,
+            occurred_at=occurred_at,
+        )
+
+    def record_attendance(
+        self,
+        *,
+        attendance_id: str,
+        learner_ref: str,
+        cohort_id: str,
+        session_id: str,
+        status: str,
+        source: str,
+        policy_version: str,
+        evidence_ref: str,
+        occurred_at: str = "2026-01-01T00:00:00Z",
+        correction_reason: str | None = None,
+    ) -> dict[str, Any]:
+        """Record attendance or an authorized correction as an idempotent event."""
+
+        allowed_statuses = {"present", "partial", "absent", "alternate_path", "excused", "corrected"}
+        allowed_sources = {"virtual_session", "alternate_path", "operator_correction", "automation"}
+        if status not in allowed_statuses:
+            raise ValueError("unsupported attendance status")
+        if source not in allowed_sources:
+            raise ValueError("unsupported attendance source")
+        if status == "corrected" and not correction_reason:
+            raise ValueError("correction_reason is required for corrected attendance")
+        payload: dict[str, Any] = {
+            "attendance_id": attendance_id,
+            "session_id": session_id,
+            "status": status,
+            "source": source,
+            "policy_version": policy_version,
+            "evidence_ref": evidence_ref,
+        }
+        if correction_reason:
+            payload["correction_reason"] = correction_reason
+        return self.ledger.append(
+            event_type="attendance.recorded.v1",
+            program_id=self.program_id,
+            producer="attendance",
+            actor_id="attendance-automation",
+            correlation_id=f"corr-{attendance_id}",
+            idempotency_key=f"attendance:{attendance_id}",
+            payload=payload,
+            privacy_class="learner_private",
+            retention_class="credential_record",
+            learner_id=learner_ref,
+            cohort_id=cohort_id,
+            occurred_at=occurred_at,
+        )
+
+    def request_support(
+        self,
+        *,
+        support_id: str,
+        learner_ref: str,
+        cohort_id: str,
+        category: str,
+        priority: str,
+        evidence_ref: str,
+        occurred_at: str = "2026-01-01T00:00:00Z",
+    ) -> list[dict[str, Any]]:
+        """Route a support request and preserve human authorization for sensitive cases."""
+
+        categories = {"accessibility", "technical", "learning", "safety", "privacy", "withdrawal", "correction", "complaint"}
+        priorities = {"routine", "urgent", "safety_critical"}
+        if category not in categories:
+            raise ValueError("unsupported support category")
+        if priority not in priorities:
+            raise ValueError("unsupported support priority")
+        start = len(self.ledger.events)
+        requested = self.ledger.append(
+            event_type="support.requested.v1",
+            program_id=self.program_id,
+            producer="support",
+            actor_id="support-automation",
+            correlation_id=f"corr-{support_id}",
+            idempotency_key=f"support:{support_id}:requested",
+            payload={
+                "support_id": support_id,
+                "category": category,
+                "priority": priority,
+                "evidence_ref": evidence_ref,
+            },
+            privacy_class="sensitive_support" if category in {"safety", "privacy", "accessibility"} else "learner_private",
+            retention_class="quality_record",
+            learner_id=learner_ref,
+            cohort_id=cohort_id,
+            occurred_at=occurred_at,
+        )
+        if category in {"safety", "privacy", "accessibility"} or priority == "safety_critical":
+            self.ledger.append(
+                event_type="human-review.requested.v1",
+                program_id=self.program_id,
+                producer="support",
+                actor_id="support-automation",
+                correlation_id=f"corr-{support_id}",
+                causation_id=requested["event_id"],
+                idempotency_key=f"support:{support_id}:human-review",
+                payload={"reason_code": f"{category}_authorization_required", "support_id": support_id},
+                privacy_class="sensitive_support",
+                retention_class="quality_record",
+                learner_id=learner_ref,
+                cohort_id=cohort_id,
+                occurred_at=occurred_at,
+            )
+        return self.ledger.events[start:]

@@ -58,6 +58,58 @@ class ControlPlaneTests(unittest.TestCase):
             self.assertIn("event_hash", event["integrity"])
             self.assertNotIn("email", event["payload"])
 
+    def test_consent_and_attendance_records_are_idempotent(self) -> None:
+        control_plane = EnrollmentControlPlane()
+        consent = control_plane.record_consent(
+            consent_id="consent-001",
+            learner_ref="learner-pseudo-005",
+            cohort_id="cohort-2026-01",
+            purposes=["attendance", "enrollment", "attendance"],
+            status="granted",
+            policy_version="privacy-0.1.0",
+            evidence_ref="evidence:consent-001",
+        )
+        attendance = control_plane.record_attendance(
+            attendance_id="attendance-001",
+            learner_ref="learner-pseudo-005",
+            cohort_id="cohort-2026-01",
+            session_id="session-001",
+            status="present",
+            source="virtual_session",
+            policy_version="attendance-0.1.0",
+            evidence_ref="evidence:attendance-001",
+        )
+        duplicate = control_plane.record_attendance(
+            attendance_id="attendance-001",
+            learner_ref="learner-pseudo-005",
+            cohort_id="cohort-2026-01",
+            session_id="session-001",
+            status="present",
+            source="virtual_session",
+            policy_version="attendance-0.1.0",
+            evidence_ref="evidence:attendance-001",
+        )
+        self.assertEqual(consent["payload"]["purposes"], ["attendance", "enrollment"])
+        self.assertEqual(attendance["event_type"], "attendance.recorded.v1")
+        self.assertEqual(duplicate["event_id"], attendance["event_id"])
+        self.assertEqual(len(control_plane.ledger.events), 2)
+
+    def test_sensitive_support_routes_to_human_review(self) -> None:
+        control_plane = EnrollmentControlPlane()
+        events = control_plane.request_support(
+            support_id="support-001",
+            learner_ref="learner-pseudo-006",
+            cohort_id="cohort-2026-01",
+            category="accessibility",
+            priority="routine",
+            evidence_ref="evidence:support-001",
+        )
+        self.assertEqual([event["event_type"] for event in events], [
+            "support.requested.v1",
+            "human-review.requested.v1",
+        ])
+        self.assertEqual(events[-1]["payload"]["reason_code"], "accessibility_authorization_required")
+
 
 if __name__ == "__main__":
     unittest.main()

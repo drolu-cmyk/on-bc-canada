@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sozorock:on-bc-canada:schema:support-case:v1",
+  "title": "Learner support case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "support_id",
+    "learner_ref",
+    "category",
+    "priority",
+    "status",
+    "created_at",
+    "region",
+    "privacy_class",
+    "retention_class",
+    "route",
+    "evidence_refs"
+  ],
+  "properties": {
+    "support_id": {"type": "string", "pattern": "^support-[A-Za-z0-9._:-]+$"},
+    "learner_ref": {"type": "string", "minLength": 8},
+    "category": {
+      "enum": ["accessibility", "technical", "learning", "safety", "privacy", "withdrawal", "correction", "complaint"]
+    },
+    "priority": {"enum": ["routine", "urgent", "safety_critical"]},
+    "status": {"enum": ["open", "awaiting_human", "in_progress", "resolved", "closed"]},
+    "created_at": {"type": "string", "format": "date-time"},
+    "region": {"const": "ca-central-1"},
+    "privacy_class": {"enum": ["learner_private", "sensitive_support"]},
+    "retention_class": {"enum": ["cohort_lifecycle", "quality_record"]},
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_role", "next_action", "human_authorization"],
+      "properties": {
+        "owner_role": {"type": "string", "minLength": 2},
+        "next_action": {"type": "string", "minLength": 2},
+        "human_authorization": {"type": "boolean"}
+      }
+    },
+    "evidence_refs": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+  }
+}
