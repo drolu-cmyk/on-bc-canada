@@ -1,0 +1,26 @@
+name: Validate automation source
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install validators
+        run: python -m pip install --disable-pip-version-check pyyaml jsonschema
+      - name: Validate contracts and claims
+        run: python scripts/validate_specs.py
+      - name: Run deterministic curriculum compiler tests
+        run: PYTHONPATH=compiler/src python -m unittest discover -s compiler/tests -v
