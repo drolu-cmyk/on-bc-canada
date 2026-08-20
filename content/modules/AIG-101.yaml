@@ -1,0 +1,44 @@
+module_id: AIG-101
+title: "AI Governance Foundations: Lifecycle and Accountability"
+version: 0.1.0
+domain: ai_governance
+description: "Establish AI governance vocabulary, accountability, lifecycle, and decision boundaries."
+outcomes:
+  - id: AIG101-O1
+    statement: "Explain AI system lifecycle stages, roles, accountability, affected people, and decision rights."
+    level: explain
+    stable: true
+  - id: AIG101-O2
+    statement: "Classify governance questions by risk, impact, evidence, owner, and required human decision."
+    level: analyze
+    stable: true
+  - id: AIG101-O3
+    statement: "Construct an AI governance operating record for a defined system context."
+    level: design
+    stable: true
+evidence:
+  - artifact_id: AIG101-A1
+    type: brief
+    maps_to_outcomes: ["AIG101-O1","AIG101-O2"]
+    rubric_id: AIG101-R1
+    required_for_certificate: false
+  - artifact_id: AIG101-A2
+    type: control_matrix
+    maps_to_outcomes: ["AIG101-O2","AIG101-O3"]
+    rubric_id: AIG101-R2
+    required_for_certificate: false
+delivery:
+  weeks: 2
+  live_sessions: ["ai_governance_seminar","accountability_mapping_studio","lifecycle_case"]
+  independent_work: ["system_context_brief","role_and_decision_map","governance_record"]
+  accessibility_path: "Lifecycle table with plain-language role descriptions and accessible export."
+change_resilience:
+  invariant_concepts: ["lifecycle_stage","accountability","affected_people","decision_rights"]
+  replaceable_tools: ["lifecycle_editor","spreadsheet","policy_repository"]
+  substitution_test: "Learners complete the governance record with a table and document when a policy platform changes."
+  refresh_triggers: ["new_ai_use","role_change","policy_change","impact_signal"]
+standards_map: ["ai.governance","ai.lifecycle","governance.accountability"]
+safe_lab:
+  allowed_data: ["synthetic_system","public_policy_reference","authorized_case"]
+  prohibited_data: ["unapproved_personal_data","production_ai_decision","private_policy_document"]
+  stop_conditions: ["unknown_system_owner","unbounded_affected_population","missing_decision_authority"]

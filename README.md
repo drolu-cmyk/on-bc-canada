@@ -34,6 +34,7 @@ The program publishes only claims supported by current records. Participation is
 - [Public information shell](site/index.html)
 - [Contribution and release rules](CONTRIBUTING.md)
 - [Program architecture](docs/program-architecture.md)
+- [Specialization curriculum](docs/specialization-curriculum.md)
 - [Automation capabilities](docs/automation-capabilities.md)
 - [Standards register](docs/standards-register.md)
 - [Quality standard](docs/public-quality-standard.md)

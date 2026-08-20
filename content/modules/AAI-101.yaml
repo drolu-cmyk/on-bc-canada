@@ -1,0 +1,44 @@
+module_id: AAI-101
+title: "Applied AI Foundations: Problems, Data, and Evaluation"
+version: 0.1.0
+domain: applied_ai
+description: "Frame an applied AI opportunity as a measurable workflow with trustworthy data and explicit evaluation."
+outcomes:
+  - id: AAI101-O1
+    statement: "Map actors, decisions, data boundaries, incentives, constraints, and failure points in a workflow."
+    level: analyze
+    stable: true
+  - id: AAI101-O2
+    statement: "Assess data provenance, evidence fitness, uncertainty, and limitations for a defined AI decision."
+    level: evaluate
+    stable: true
+  - id: AAI101-O3
+    statement: "Design evaluation criteria, human boundaries, and evidence requirements for an applied AI use."
+    level: design
+    stable: true
+evidence:
+  - artifact_id: AAI101-A1
+    type: brief
+    maps_to_outcomes: ["AAI101-O1","AAI101-O2"]
+    rubric_id: AAI101-R1
+    required_for_certificate: false
+  - artifact_id: AAI101-A2
+    type: evaluation_report
+    maps_to_outcomes: ["AAI101-O2","AAI101-O3"]
+    rubric_id: AAI101-R2
+    required_for_certificate: false
+delivery:
+  weeks: 2
+  live_sessions: ["problem_framing_seminar","data_evidence_studio","evaluation_boundary_case"]
+  independent_work: ["workflow_inventory","evidence_quality_note","evaluation_matrix"]
+  accessibility_path: "Structured workflow and evaluation tables plus written or audio explanation using the same rubric."
+change_resilience:
+  invariant_concepts: ["problem_boundary","data_provenance","evidence_fitness","evaluation_criteria"]
+  replaceable_tools: ["diagram_editor","spreadsheet","model_evaluation_interface"]
+  substitution_test: "Learners represent the workflow and evaluation in tables or plain text without changing the reasoning standard."
+  refresh_triggers: ["new_workflow_pattern","provider_data_flow_change","new_failure_mode"]
+standards_map: ["quality.learning_outcomes","privacy.data_minimization","ai.evaluation"]
+safe_lab:
+  allowed_data: ["synthetic_workflow","public_dataset","deterministic_mock_output"]
+  prohibited_data: ["production_credentials","private_personal_information","real_person_decisions"]
+  stop_conditions: ["unclear_workflow_authorization","unverifiable_data_source","unbounded_decision_consequence"]

@@ -39,7 +39,10 @@ class CompilerTests(unittest.TestCase):
             release_root = first_manifest.parent
             self.assertTrue((release_root / "evidence-index.json").exists())
             self.assertTrue((release_root / "checks/report.json").exists())
-            self.assertEqual(len(list((release_root / "learner/pages").glob("*.md"))), 6)
+            self.assertEqual(
+                len(list((release_root / "learner/pages").glob("*.md"))),
+                len(list(SOURCE.glob("*.yaml"))),
+            )
 
     def test_missing_outcome_mapping_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

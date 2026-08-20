@@ -1,0 +1,44 @@
+module_id: GRC-102
+title: "Cybersecurity GRC Practicum: Risk to Evidence"
+version: 0.1.0
+domain: cybersecurity_grc
+description: "Defend a complete cybersecurity governance, risk, control, assurance, incident, and metrics record."
+outcomes:
+  - id: GRC102-O1
+    statement: "Integrate governance context, risk analysis, control design, assurance, incident learning, and metrics."
+    level: design
+    stable: true
+  - id: GRC102-O2
+    statement: "Defend control choices, residual risk, evidence quality, exceptions, and decision authority."
+    level: defend
+    stable: true
+  - id: GRC102-O3
+    statement: "Revise the GRC dossier from critique and demonstrate traceability across a changed scenario."
+    level: evaluate
+    stable: true
+evidence:
+  - artifact_id: GRC102-A1
+    type: portfolio
+    maps_to_outcomes: ["GRC102-O1","GRC102-O3"]
+    rubric_id: GRC102-R1
+    required_for_certificate: false
+  - artifact_id: GRC102-A2
+    type: oral_defense
+    maps_to_outcomes: ["GRC102-O2","GRC102-O3"]
+    rubric_id: GRC102-R2
+    required_for_certificate: false
+delivery:
+  weeks: 2
+  live_sessions: ["grc_practicum_studio","assurance_critique","risk_committee_defense"]
+  independent_work: ["grc_dossier","assurance_review","revised_defense"]
+  accessibility_path: "Portfolio, written defense, audio defense, or captioned video use the same evidence standard."
+change_resilience:
+  invariant_concepts: ["risk_to_control_trace","evidence_integrity","decision_authority","corrective_action"]
+  replaceable_tools: ["grc_register","document_editor","presentation_tool"]
+  substitution_test: "Learners defend the dossier with repository files and structured tables when a GRC platform changes."
+  refresh_triggers: ["control_framework_change","major_incident","supplier_change","risk_appetite_change"]
+standards_map: ["security.governance","security.assurance","quality.evidence_traceability"]
+safe_lab:
+  allowed_data: ["synthetic_organization","public_framework","mock_incident"]
+  prohibited_data: ["real_security_incident","production_access","private_audit_evidence"]
+  stop_conditions: ["unresolved_high_severity_risk","missing_control_owner","unsupported_assurance_claim"]
