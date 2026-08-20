@@ -8,6 +8,9 @@ deployment:
     artifact_directory: dist/public-site
     template: infra/public-site.template.json
     hosting: cloudfront_s3
+    canonical_origin: "https://www.sozorock.ca"
+    domain_name: www.sozorock.ca
+    certificate_region: us-east-1
     data_collection: disabled
     external_side_effects: disabled
     allowed_methods:

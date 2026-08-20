@@ -4,50 +4,160 @@
   "title": "Public release deployment contract",
   "type": "object",
   "additionalProperties": false,
-  "required": ["deployment"],
+  "required": [
+    "deployment"
+  ],
   "properties": {
     "deployment": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["deployment_id", "version", "status", "stack_region", "public_site", "learner_services", "release_gate"],
+      "required": [
+        "deployment_id",
+        "version",
+        "status",
+        "stack_region",
+        "public_site",
+        "learner_services",
+        "release_gate"
+      ],
       "properties": {
-        "deployment_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
-        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
-        "status": {"enum": ["source_only", "public_static", "learner_services_enabled"]},
-        "stack_region": {"const": "ca-central-1"},
+        "deployment_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "status": {
+          "enum": [
+            "source_only",
+            "public_static",
+            "learner_services_enabled"
+          ]
+        },
+        "stack_region": {
+          "const": "ca-central-1"
+        },
         "public_site": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["source_directory", "artifact_directory", "template", "hosting", "data_collection", "external_side_effects", "allowed_methods"],
+          "required": [
+            "source_directory",
+            "artifact_directory",
+            "template",
+            "hosting",
+            "data_collection",
+            "external_side_effects",
+            "allowed_methods",
+            "canonical_origin",
+            "domain_name",
+            "certificate_region"
+          ],
           "properties": {
-            "source_directory": {"const": "site"},
-            "artifact_directory": {"type": "string", "minLength": 3},
-            "template": {"const": "infra/public-site.template.json"},
-            "hosting": {"const": "cloudfront_s3"},
-            "data_collection": {"enum": ["disabled", "controlled"]},
-            "external_side_effects": {"enum": ["disabled", "adapter_approved"]},
-            "allowed_methods": {"const": ["GET", "HEAD"]}
+            "source_directory": {
+              "const": "site"
+            },
+            "artifact_directory": {
+              "type": "string",
+              "minLength": 3
+            },
+            "template": {
+              "const": "infra/public-site.template.json"
+            },
+            "hosting": {
+              "const": "cloudfront_s3"
+            },
+            "data_collection": {
+              "enum": [
+                "disabled",
+                "controlled"
+              ]
+            },
+            "external_side_effects": {
+              "enum": [
+                "disabled",
+                "adapter_approved"
+              ]
+            },
+            "allowed_methods": {
+              "const": [
+                "GET",
+                "HEAD"
+              ]
+            },
+            "canonical_origin": {
+              "const": "https://www.sozorock.ca"
+            },
+            "domain_name": {
+              "const": "www.sozorock.ca"
+            },
+            "certificate_region": {
+              "const": "us-east-1"
+            }
           }
         },
         "learner_services": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["status", "intake", "production_data", "external_side_effects", "reference_region"],
+          "required": [
+            "status",
+            "intake",
+            "production_data",
+            "external_side_effects",
+            "reference_region"
+          ],
           "properties": {
-            "status": {"enum": ["disabled", "sandbox", "production"]},
-            "intake": {"enum": ["disabled", "controlled"]},
-            "production_data": {"enum": ["disabled", "controlled"]},
-            "external_side_effects": {"enum": ["disabled", "adapter_approved"]},
-            "reference_region": {"const": "ca-central-1"}
+            "status": {
+              "enum": [
+                "disabled",
+                "sandbox",
+                "production"
+              ]
+            },
+            "intake": {
+              "enum": [
+                "disabled",
+                "controlled"
+              ]
+            },
+            "production_data": {
+              "enum": [
+                "disabled",
+                "controlled"
+              ]
+            },
+            "external_side_effects": {
+              "enum": [
+                "disabled",
+                "adapter_approved"
+              ]
+            },
+            "reference_region": {
+              "const": "ca-central-1"
+            }
           }
         },
         "release_gate": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["automated_checks", "human_authorization_role"],
+          "required": [
+            "automated_checks",
+            "human_authorization_role"
+          ],
           "properties": {
-            "automated_checks": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
-            "human_authorization_role": {"type": "string", "minLength": 2}
+            "automated_checks": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string"
+              }
+            },
+            "human_authorization_role": {
+              "type": "string",
+              "minLength": 2
+            }
           }
         }
       }

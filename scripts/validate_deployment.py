@@ -16,6 +16,9 @@ except ModuleNotFoundError:
 
 
 ROOT = Path(__file__).resolve().parents[1]
+CANONICAL_ORIGIN = "https://www.sozorock.ca"
+CANONICAL_DOMAIN = "www.sozorock.ca"
+CERTIFICATE_REGION = "us-east-1"
 
 
 def load_yaml(path: Path):
@@ -45,7 +48,12 @@ def validate_contract() -> list[str]:
 def validate_template() -> list[str]:
     template = load_json(ROOT / "infra/public-site.template.json")
     resources = template.get("Resources", {})
+    parameters = template.get("Parameters", {})
     errors: list[str] = []
+    if parameters.get("DomainName", {}).get("Default") != CANONICAL_DOMAIN:
+        errors.append("CloudFront DomainName default must be www.sozorock.ca")
+    if parameters.get("CertificateArn", {}).get("Type") != "String":
+        errors.append("CloudFront CertificateArn parameter is required")
     required_types = {
         "PublicSiteBucket": "AWS::S3::Bucket",
         "PublicSiteOriginAccessControl": "AWS::CloudFront::OriginAccessControl",
@@ -70,6 +78,15 @@ def validate_template() -> list[str]:
 
     distribution = resources.get("PublicSiteDistribution", {})
     distribution_config = distribution.get("Properties", {}).get("DistributionConfig", {})
+    if distribution_config.get("Aliases") != [{"Ref": "DomainName"}]:
+        errors.append("CloudFront must serve the canonical hostname through DomainName")
+    viewer_certificate = distribution_config.get("ViewerCertificate", {})
+    if viewer_certificate.get("AcmCertificate") != {"Ref": "CertificateArn"}:
+        errors.append("CloudFront must use the supplied ACM certificate")
+    if viewer_certificate.get("SslSupportMethod") != "sni-only":
+        errors.append("CloudFront custom-domain TLS must use SNI")
+    if viewer_certificate.get("MinimumProtocolVersion") != "TLSv1.2_2021":
+        errors.append("CloudFront custom-domain TLS must require TLS 1.2")
     if distribution_config.get("DefaultRootObject") != "index.html":
         errors.append("CloudFront default root object must be index.html")
     behavior = distribution_config.get("DefaultCacheBehavior", {})
@@ -85,6 +102,13 @@ def validate_template() -> list[str]:
 def validate_source_boundary() -> list[str]:
     deployment = load_yaml(ROOT / "config/deployment.yaml").get("deployment", {})
     errors: list[str] = []
+    public_site = deployment.get("public_site", {})
+    if public_site.get("canonical_origin") != CANONICAL_ORIGIN:
+        errors.append("public_site.canonical_origin must be https://www.sozorock.ca")
+    if public_site.get("domain_name") != CANONICAL_DOMAIN:
+        errors.append("public_site.domain_name must be www.sozorock.ca")
+    if public_site.get("certificate_region") != CERTIFICATE_REGION:
+        errors.append("public_site.certificate_region must be us-east-1")
     if deployment.get("status") != "source_only":
         errors.append("deployment status must remain source_only")
     public_site = deployment.get("public_site", {})
