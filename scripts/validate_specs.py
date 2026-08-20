@@ -118,6 +118,7 @@ def main() -> int:
         "support-case.schema.json",
         "automation.schema.json",
         "data-controls.schema.json",
+        "deployment.schema.json",
     ]:
         schema = load_json(ROOT / "schemas" / schema_name)
         if Draft202012Validator is None:
@@ -128,6 +129,7 @@ def main() -> int:
 
     ok = validate_config_instance(ROOT / "config/automation.yaml", ROOT / "schemas/automation.schema.json") and ok
     ok = validate_config_instance(ROOT / "config/data-controls.yaml", ROOT / "schemas/data-controls.schema.json") and ok
+    ok = validate_config_instance(ROOT / "config/deployment.yaml", ROOT / "schemas/deployment.schema.json") and ok
     ok = validate_modules() and ok
     ok = check_claims() and ok
     return 0 if ok else 1
