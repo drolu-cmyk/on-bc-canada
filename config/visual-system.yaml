@@ -1,0 +1,24 @@
+visual_system:
+  version: 0.1.0
+  palette:
+    primary_navy: "#0B2545"
+    accent_blue: "#2E74B5"
+    dark_blue: "#1F4D78"
+    muted_slate: "#5B6573"
+    light_blue: "#E8EEF5"
+    light_gray: "#F4F6F9"
+    grid: "#D6DEE8"
+    white: "#FFFFFF"
+  usage:
+    primary_navy: "titles, primary text, high-trust anchors"
+    accent_blue: "headings, links, active controls"
+    dark_blue: "secondary headings and callout labels"
+    muted_slate: "metadata and supporting text"
+    light_blue: "information callouts and section emphasis"
+    light_gray: "neutral callouts and generated document panels"
+  rules:
+    - "Use whitespace and hierarchy before decorative elements."
+    - "Keep learner-facing pages calm, readable, and task-oriented."
+    - "Do not use color as the only means of conveying status or error."
+    - "Run contrast and keyboard checks before release."
+
