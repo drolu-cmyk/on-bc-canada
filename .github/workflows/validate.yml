@@ -25,6 +25,8 @@ jobs:
         run: python scripts/validate_public_copy.py
       - name: Validate public information shell
         run: python scripts/validate_site.py
+      - name: Validate public deployment contract
+        run: python scripts/validate_deployment.py
       - name: Run deterministic curriculum compiler tests
         run: PYTHONPATH=compiler/src python -m unittest discover -s compiler/tests -v
       - name: Build and validate a release manifest

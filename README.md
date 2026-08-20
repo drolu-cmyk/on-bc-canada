@@ -37,6 +37,7 @@ The program publishes only claims supported by current records. Participation is
 - [Specialization curriculum](docs/specialization-curriculum.md)
 - [Automation capabilities](docs/automation-capabilities.md)
 - [Learner operations](docs/learner-operations.md)
+- [Public launch](docs/public-launch.md)
 - [Standards register](docs/standards-register.md)
 - [Quality standard](docs/public-quality-standard.md)
 - [Funding evidence system](docs/funding-evidence-system.md)

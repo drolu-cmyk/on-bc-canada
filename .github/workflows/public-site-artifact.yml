@@ -1,0 +1,38 @@
+name: Build public information artifact
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install validators
+        run: python -m pip install --disable-pip-version-check pyyaml jsonschema
+      - name: Validate public artifact
+        run: |
+          python scripts/validate_public_copy.py
+          python scripts/validate_site.py
+          python scripts/validate_deployment.py
+      - name: Assemble static artifact
+        run: |
+          mkdir -p dist/public-site
+          cp -R site/. dist/public-site/
+          cp config/deployment.yaml dist/public-site/deployment-record.yaml
+      - name: Upload static artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: applied-ai-training-canada-public-site
+          path: dist/public-site
+          if-no-files-found: error

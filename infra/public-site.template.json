@@ -1,0 +1,125 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Private S3 origin and CloudFront distribution for the Applied AI Training for Canada public information shell.",
+  "Parameters": {
+    "PublicSiteBucketName": {
+      "Type": "String",
+      "Description": "Globally unique S3 bucket name for the static public information artifact.",
+      "AllowedPattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+    },
+    "PriceClass": {
+      "Type": "String",
+      "Default": "PriceClass_100",
+      "AllowedValues": ["PriceClass_100", "PriceClass_200", "PriceClass_All"]
+    }
+  },
+  "Resources": {
+    "PublicSiteBucket": {
+      "Type": "AWS::S3::Bucket",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "BucketName": {"Ref": "PublicSiteBucketName"},
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {"ServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}
+          ]
+        },
+        "OwnershipControls": {
+          "Rules": [{"ObjectOwnership": "BucketOwnerEnforced"}]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "VersioningConfiguration": {"Status": "Enabled"}
+      }
+    },
+    "PublicSiteOriginAccessControl": {
+      "Type": "AWS::CloudFront::OriginAccessControl",
+      "Properties": {
+        "OriginAccessControlConfig": {
+          "Name": {"Fn::Sub": "${AWS::StackName}-public-site-oac"},
+          "Description": "SigV4 access from CloudFront to the private public-site bucket.",
+          "OriginAccessControlOriginType": "s3",
+          "SigningBehavior": "always",
+          "SigningProtocol": "sigv4"
+        }
+      }
+    },
+    "PublicSiteDistribution": {
+      "Type": "AWS::CloudFront::Distribution",
+      "Properties": {
+        "DistributionConfig": {
+          "Enabled": true,
+          "Comment": "Applied AI Training for Canada public information shell",
+          "DefaultRootObject": "index.html",
+          "HttpVersion": "http2and3",
+          "PriceClass": {"Ref": "PriceClass"},
+          "Origins": [
+            {
+              "Id": "PublicSiteOrigin",
+              "DomainName": {"Fn::GetAtt": ["PublicSiteBucket", "RegionalDomainName"]},
+              "S3OriginConfig": {},
+              "OriginAccessControlId": {"Ref": "PublicSiteOriginAccessControl"}
+            }
+          ],
+          "DefaultCacheBehavior": {
+            "TargetOriginId": "PublicSiteOrigin",
+            "ViewerProtocolPolicy": "redirect-to-https",
+            "AllowedMethods": ["GET", "HEAD"],
+            "CachedMethods": ["GET", "HEAD"],
+            "Compress": true,
+            "ForwardedValues": {
+              "QueryString": false,
+              "Cookies": {"Forward": "none"}
+            }
+          },
+          "CustomErrorResponses": [
+            {"ErrorCode": 403, "ResponseCode": 404, "ResponsePagePath": "/404.html", "ErrorCachingMinTTL": 60},
+            {"ErrorCode": 404, "ResponseCode": 404, "ResponsePagePath": "/404.html", "ErrorCachingMinTTL": 60}
+          ]
+        }
+      }
+    },
+    "PublicSiteBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {"Ref": "PublicSiteBucket"},
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AllowCloudFrontReadOnly",
+              "Effect": "Allow",
+              "Principal": {"Service": "cloudfront.amazonaws.com"},
+              "Action": "s3:GetObject",
+              "Resource": {"Fn::Sub": "${PublicSiteBucket.Arn}/*"},
+              "Condition": {
+                "StringEquals": {
+                  "AWS:SourceArn": {"Fn::Sub": "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${PublicSiteDistribution}"}
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "PublicSiteBucket": {
+      "Description": "Private S3 bucket for the public information artifact.",
+      "Value": {"Ref": "PublicSiteBucket"}
+    },
+    "PublicSiteDistributionId": {
+      "Description": "CloudFront distribution identifier.",
+      "Value": {"Ref": "PublicSiteDistribution"}
+    },
+    "PublicSiteDomainName": {
+      "Description": "CloudFront distribution domain name.",
+      "Value": {"Fn::GetAtt": ["PublicSiteDistribution", "DomainName"]}
+    }
+  }
+}

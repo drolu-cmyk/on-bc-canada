@@ -1,0 +1,31 @@
+deployment:
+  deployment_id: public-information-shell
+  version: 0.1.0
+  status: source_only
+  stack_region: ca-central-1
+  public_site:
+    source_directory: site
+    artifact_directory: dist/public-site
+    template: infra/public-site.template.json
+    hosting: cloudfront_s3
+    data_collection: disabled
+    external_side_effects: disabled
+    allowed_methods:
+      - GET
+      - HEAD
+  learner_services:
+    status: disabled
+    intake: disabled
+    production_data: disabled
+    external_side_effects: disabled
+    reference_region: ca-central-1
+  release_gate:
+    automated_checks:
+      - validate_specs
+      - validate_public_copy
+      - validate_site
+      - validate_deployment
+      - compiler_tests
+      - runtime_tests
+      - release_manifest
+    human_authorization_role: deployment_owner
