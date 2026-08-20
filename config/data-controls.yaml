@@ -78,7 +78,7 @@ data_controls:
         - safety_and_security_owner
         - operator
 
-    - id: shared_artifacts
+    - id: shared-artifacts
       purpose: Share generated program, learning, and funder evidence artifacts.
       allowed_fields:
         - artifact_id
