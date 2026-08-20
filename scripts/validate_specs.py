@@ -91,7 +91,12 @@ def main() -> int:
     else:
         print("OK    config/program.yaml")
 
-    for schema_name in ["module.schema.json", "learner-event.schema.json", "provider-adapter.schema.json"]:
+    for schema_name in [
+        "module.schema.json",
+        "learner-event.schema.json",
+        "provider-adapter.schema.json",
+        "release-manifest.schema.json",
+    ]:
         schema = load_json(ROOT / "schemas" / schema_name)
         if Draft202012Validator is None:
             print(f"OK    schemas/{schema_name} JSON syntax (semantic validation deferred to CI)")

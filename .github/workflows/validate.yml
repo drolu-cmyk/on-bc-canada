@@ -24,3 +24,12 @@ jobs:
         run: python scripts/validate_specs.py
       - name: Run deterministic curriculum compiler tests
         run: PYTHONPATH=compiler/src python -m unittest discover -s compiler/tests -v
+      - name: Build and validate a release manifest
+        run: |
+          PYTHONPATH=compiler/src python -m curriculum_compiler.compile \
+            --source content/modules \
+            --output /tmp/on-bc-canada-generated \
+            --program-id applied-ai-training-canada \
+            --release-version 0.1.0
+          python scripts/validate_release.py \
+            /tmp/on-bc-canada-generated/releases/applied-ai-training-canada/0.1.0/release-manifest.json
