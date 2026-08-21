@@ -39,6 +39,7 @@
             "domain_names",
             "canonical_root_domain_name",
             "canonical_domain_name",
+            "canonical_dns_zone_name",
             "legacy_domain_names",
             "legacy_redirect_status",
             "certificate_region"
@@ -57,6 +58,7 @@
             },
             "canonical_root_domain_name": {"const": "sozorock.com"},
             "canonical_domain_name": {"const": "canada.sozorock.com"},
+            "canonical_dns_zone_name": {"const": "canada.sozorock.com"},
             "legacy_domain_names": {"const": ["sozorock.ca", "www.sozorock.ca"]},
             "legacy_redirect_status": {"const": 301},
             "certificate_region": {"const": "us-east-1"}

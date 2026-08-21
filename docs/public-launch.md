@@ -23,6 +23,8 @@ Both legacy hosts preserve the requested path and query string when redirecting 
 
 The public site uses a private S3 origin and CloudFront distribution. The application stack remains in AWS Canada Central (`ca-central-1`). The CloudFront certificate is managed in `us-east-1`, as required for CloudFront custom domains.
 
+DNS authority is separated by boundary. The parent `sozorock.com` zone retains the delegation record for `canada.sozorock.com`. AWS account `891377012881` owns the delegated public `canada.sozorock.com` Route 53 zone and the `sozorock.ca` legacy zone used by this deployment. The Canada deployment writes only inside those two approved zones.
+
 ## Program boundary
 
 The training is free and virtual across Canada. Public participation information does not represent accreditation, a degree, diploma, professional licence, employment guarantee, immigration pathway, study permit pathway, endorsement, affiliation, or competency credential.

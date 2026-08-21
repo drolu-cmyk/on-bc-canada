@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CANONICAL_ORIGIN = "https://canada.sozorock.com"
 CANONICAL_ROOT_DOMAIN = "sozorock.com"
 CANONICAL_DOMAIN = "canada.sozorock.com"
+CANONICAL_DNS_ZONE = "canada.sozorock.com"
 LEGACY_DOMAINS = ["sozorock.ca", "www.sozorock.ca"]
 PUBLIC_DOMAINS = [CANONICAL_DOMAIN, *LEGACY_DOMAINS]
 CERTIFICATE_REGION = "us-east-1"
@@ -173,6 +174,8 @@ def validate_source_boundary() -> list[str]:
         errors.append("public_site.canonical_root_domain_name must be sozorock.com")
     if public_site.get("canonical_domain_name") != CANONICAL_DOMAIN:
         errors.append("public_site.canonical_domain_name must be canada.sozorock.com")
+    if public_site.get("canonical_dns_zone_name") != CANONICAL_DNS_ZONE:
+        errors.append("public_site.canonical_dns_zone_name must be canada.sozorock.com")
     if public_site.get("legacy_domain_names") != LEGACY_DOMAINS:
         errors.append("public_site.legacy_domain_names must be sozorock.ca and www.sozorock.ca")
     if public_site.get("legacy_redirect_status") != 301:
@@ -204,7 +207,7 @@ def main() -> int:
         print("Deployment validation failed:", file=sys.stderr)
         print("\n".join(errors), file=sys.stderr)
         return 1
-    print("Deployment validation passed for canada.sozorock.com with permanent .ca redirects.")
+    print("Deployment validation passed for delegated canada.sozorock.com DNS with permanent .ca redirects.")
     return 0
 
 

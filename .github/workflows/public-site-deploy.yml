@@ -30,6 +30,7 @@ env:
   CERTIFICATE_REGION: us-east-1
   CANONICAL_ROOT_DOMAIN: sozorock.com
   CANONICAL_DOMAIN: canada.sozorock.com
+  CANONICAL_DNS_ZONE: canada.sozorock.com
   LEGACY_ROOT_DOMAIN: sozorock.ca
   LEGACY_WWW_DOMAIN: www.sozorock.ca
   STACK_NAME: sozorock-ca-public-site
@@ -87,6 +88,7 @@ jobs:
           CERTIFICATE_REGION: us-east-1
           CANONICAL_ROOT_DOMAIN: sozorock.com
           CANONICAL_DOMAIN: canada.sozorock.com
+          CANONICAL_DNS_ZONE: canada.sozorock.com
           LEGACY_ROOT_DOMAIN: sozorock.ca
           LEGACY_WWW_DOMAIN: www.sozorock.ca
           STACK_NAME: sozorock-ca-public-site
