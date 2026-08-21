@@ -2,6 +2,8 @@
 
 Applied AI Training for Canada is a free, 100% virtual training initiative operated by SozoRock Tech Inc Canada. The program serves learners across Canada, with Ontario as the primary operating province and British Columbia, including Abbotsford, as a regional context.
 
+Public site: https://www.sozorock.ca
+
 ## Program
 
 - Domains: Applied AI, Cybersecurity GRC, AI Governance, and Cloud.

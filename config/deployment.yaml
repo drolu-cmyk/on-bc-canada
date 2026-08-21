@@ -3,11 +3,20 @@ deployment:
   version: 0.1.0
   status: source_only
   stack_region: ca-central-1
+  automation:
+    workflow: .github/workflows/public-site-deploy.yml
+    authentication: github_oidc
+    account_id: "891377012881"
+    region: ca-central-1
+    trigger: main_push
   public_site:
     source_directory: site
     artifact_directory: dist/public-site
     template: infra/public-site.template.json
     hosting: cloudfront_s3
+    canonical_origin: "https://www.sozorock.ca"
+    domain_name: www.sozorock.ca
+    certificate_region: us-east-1
     data_collection: disabled
     external_side_effects: disabled
     allowed_methods:

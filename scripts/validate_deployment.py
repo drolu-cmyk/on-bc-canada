@@ -16,6 +16,11 @@ except ModuleNotFoundError:
 
 
 ROOT = Path(__file__).resolve().parents[1]
+CANONICAL_ORIGIN = "https://www.sozorock.ca"
+CANONICAL_DOMAIN = "www.sozorock.ca"
+CERTIFICATE_REGION = "us-east-1"
+AUTOMATION_WORKFLOW = ".github/workflows/public-site-deploy.yml"
+AWS_ACCOUNT_ID = "891377012881"
 
 
 def load_yaml(path: Path):
@@ -45,7 +50,12 @@ def validate_contract() -> list[str]:
 def validate_template() -> list[str]:
     template = load_json(ROOT / "infra/public-site.template.json")
     resources = template.get("Resources", {})
+    parameters = template.get("Parameters", {})
     errors: list[str] = []
+    if parameters.get("DomainName", {}).get("Default") != CANONICAL_DOMAIN:
+        errors.append("CloudFront DomainName default must be www.sozorock.ca")
+    if parameters.get("CertificateArn", {}).get("Type") != "String":
+        errors.append("CloudFront CertificateArn parameter is required")
     required_types = {
         "PublicSiteBucket": "AWS::S3::Bucket",
         "PublicSiteOriginAccessControl": "AWS::CloudFront::OriginAccessControl",
@@ -70,6 +80,15 @@ def validate_template() -> list[str]:
 
     distribution = resources.get("PublicSiteDistribution", {})
     distribution_config = distribution.get("Properties", {}).get("DistributionConfig", {})
+    if distribution_config.get("Aliases") != [{"Ref": "DomainName"}]:
+        errors.append("CloudFront must serve the canonical hostname through DomainName")
+    viewer_certificate = distribution_config.get("ViewerCertificate", {})
+    if viewer_certificate.get("AcmCertificate") != {"Ref": "CertificateArn"}:
+        errors.append("CloudFront must use the supplied ACM certificate")
+    if viewer_certificate.get("SslSupportMethod") != "sni-only":
+        errors.append("CloudFront custom-domain TLS must use SNI")
+    if viewer_certificate.get("MinimumProtocolVersion") != "TLSv1.2_2021":
+        errors.append("CloudFront custom-domain TLS must require TLS 1.2")
     if distribution_config.get("DefaultRootObject") != "index.html":
         errors.append("CloudFront default root object must be index.html")
     behavior = distribution_config.get("DefaultCacheBehavior", {})
@@ -85,6 +104,24 @@ def validate_template() -> list[str]:
 def validate_source_boundary() -> list[str]:
     deployment = load_yaml(ROOT / "config/deployment.yaml").get("deployment", {})
     errors: list[str] = []
+    automation = deployment.get("automation", {})
+    if automation.get("workflow") != AUTOMATION_WORKFLOW:
+        errors.append("automation.workflow must be .github/workflows/public-site-deploy.yml")
+    if automation.get("authentication") != "github_oidc":
+        errors.append("automation.authentication must be github_oidc")
+    if automation.get("account_id") != AWS_ACCOUNT_ID:
+        errors.append("automation.account_id must be 891377012881")
+    if automation.get("region") != "ca-central-1":
+        errors.append("automation.region must be ca-central-1")
+    if automation.get("trigger") != "main_push":
+        errors.append("automation.trigger must be main_push")
+    public_site = deployment.get("public_site", {})
+    if public_site.get("canonical_origin") != CANONICAL_ORIGIN:
+        errors.append("public_site.canonical_origin must be https://www.sozorock.ca")
+    if public_site.get("domain_name") != CANONICAL_DOMAIN:
+        errors.append("public_site.domain_name must be www.sozorock.ca")
+    if public_site.get("certificate_region") != CERTIFICATE_REGION:
+        errors.append("public_site.certificate_region must be us-east-1")
     if deployment.get("status") != "source_only":
         errors.append("deployment status must remain source_only")
     public_site = deployment.get("public_site", {})

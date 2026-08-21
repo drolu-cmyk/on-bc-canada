@@ -1,0 +1,75 @@
+name: Deploy public site to AWS Canada
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/public-site-deploy.yml"
+      - "config/deployment.yaml"
+      - "infra/**"
+      - "scripts/**"
+      - "site/**"
+      - "schemas/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AWS_ACCOUNT_ID: "891377012881"
+  AWS_REGION: ca-central-1
+  CERTIFICATE_REGION: us-east-1
+  DOMAIN_NAME: www.sozorock.ca
+  STACK_NAME: sozorock-ca-public-site
+  PUBLIC_SITE_BUCKET_NAME: ${{ vars.PUBLIC_SITE_BUCKET_NAME || 'sozorock-ca-public-site-891377012881' }}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install validators
+        run: python -m pip install --disable-pip-version-check pyyaml jsonschema
+      - name: Validate specifications
+        run: python scripts/validate_specs.py
+      - name: Validate public copy
+        run: python scripts/validate_public_copy.py
+      - name: Validate static site
+        run: python scripts/validate_site.py
+      - name: Validate deployment
+        run: python scripts/validate_deployment.py
+      - name: Run compiler tests
+        run: PYTHONPATH=compiler/src python -m unittest discover -s compiler/tests -v
+      - name: Run runtime tests
+        run: python -m unittest discover -s runtime -p 'test_*.py' -v
+      - name: Check deployment script syntax
+        run: bash -n scripts/deploy_public_site.sh
+
+  deploy:
+    if: vars.PUBLIC_SITE_DEPLOYMENT_ENABLED == 'true'
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials with GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v6.2.3
+        with:
+          role-to-assume: arn:aws:iam::891377012881:role/SozoRockCanadaPublicSiteDeploy
+          aws-region: ca-central-1
+          role-session-name: sozorock-ca-${{ github.run_id }}
+          allowed-account-ids: "891377012881"
+      - name: Deploy and publish
+        env:
+          AWS_ACCOUNT_ID: "891377012881"
+          AWS_REGION: ca-central-1
+          CERTIFICATE_REGION: us-east-1
+          DOMAIN_NAME: www.sozorock.ca
+          STACK_NAME: sozorock-ca-public-site
+          PUBLIC_SITE_BUCKET_NAME: ${{ vars.PUBLIC_SITE_BUCKET_NAME || 'sozorock-ca-public-site-891377012881' }}
+        run: ./scripts/deploy_public_site.sh
