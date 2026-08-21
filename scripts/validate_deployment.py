@@ -19,6 +19,8 @@ ROOT = Path(__file__).resolve().parents[1]
 CANONICAL_ORIGIN = "https://www.sozorock.ca"
 CANONICAL_DOMAIN = "www.sozorock.ca"
 CERTIFICATE_REGION = "us-east-1"
+AUTOMATION_WORKFLOW = ".github/workflows/public-site-deploy.yml"
+AWS_ACCOUNT_ID = "891377012881"
 
 
 def load_yaml(path: Path):
@@ -102,6 +104,17 @@ def validate_template() -> list[str]:
 def validate_source_boundary() -> list[str]:
     deployment = load_yaml(ROOT / "config/deployment.yaml").get("deployment", {})
     errors: list[str] = []
+    automation = deployment.get("automation", {})
+    if automation.get("workflow") != AUTOMATION_WORKFLOW:
+        errors.append("automation.workflow must be .github/workflows/public-site-deploy.yml")
+    if automation.get("authentication") != "github_oidc":
+        errors.append("automation.authentication must be github_oidc")
+    if automation.get("account_id") != AWS_ACCOUNT_ID:
+        errors.append("automation.account_id must be 891377012881")
+    if automation.get("region") != "ca-central-1":
+        errors.append("automation.region must be ca-central-1")
+    if automation.get("trigger") != "main_push":
+        errors.append("automation.trigger must be main_push")
     public_site = deployment.get("public_site", {})
     if public_site.get("canonical_origin") != CANONICAL_ORIGIN:
         errors.append("public_site.canonical_origin must be https://www.sozorock.ca")

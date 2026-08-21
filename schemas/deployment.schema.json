@@ -18,7 +18,8 @@
         "stack_region",
         "public_site",
         "learner_services",
-        "release_gate"
+        "release_gate",
+        "automation"
       ],
       "properties": {
         "deployment_id": {
@@ -157,6 +158,34 @@
             "human_authorization_role": {
               "type": "string",
               "minLength": 2
+            }
+          }
+        },
+        "automation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "workflow",
+            "authentication",
+            "account_id",
+            "region",
+            "trigger"
+          ],
+          "properties": {
+            "workflow": {
+              "const": ".github/workflows/public-site-deploy.yml"
+            },
+            "authentication": {
+              "const": "github_oidc"
+            },
+            "account_id": {
+              "const": "891377012881"
+            },
+            "region": {
+              "const": "ca-central-1"
+            },
+            "trigger": {
+              "const": "main_push"
             }
           }
         }
