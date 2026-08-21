@@ -58,7 +58,9 @@ jobs:
       - name: Run runtime tests
         run: python -m unittest discover -s runtime -p 'test_*.py' -v
       - name: Check deployment script syntax
-        run: bash -n scripts/deploy_public_site.sh
+        run: |
+          bash -n scripts/deploy_public_site.sh
+          bash -n scripts/preflight_cloudfront_function.sh
 
   deploy:
     if: github.ref == 'refs/heads/main' && vars.PUBLIC_SITE_DEPLOYMENT_ENABLED == 'true' && vars.CANADA_DOMAIN_MIGRATION_ENABLED == 'true'
@@ -76,6 +78,8 @@ jobs:
           aws-region: ca-central-1
           role-session-name: sozorock-ca-${{ github.run_id }}
           allowed-account-ids: "891377012881"
+      - name: Verify CloudFront Function permissions
+        run: ./scripts/preflight_cloudfront_function.sh
       - name: Deploy and publish
         env:
           AWS_ACCOUNT_ID: "891377012881"
