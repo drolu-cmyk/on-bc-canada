@@ -79,32 +79,51 @@ if [[ -n "${stack_status}" && "${stack_status}" != "None" ]]; then
   fi
 fi
 
+hosted_zone_id_for_name() {
+  local zone_name="$1"
+  aws route53 list-hosted-zones-by-name \
+    --dns-name "${zone_name}" \
+    --output json | jq -r --arg zone "${zone_name}" \
+      '[.HostedZones[] | select(.Name == $zone and .Config.PrivateZone == false) | .Id] | first // empty'
+}
+
+is_child_zone_delegated() {
+  local parent_zone_id="$1"
+  local child_zone_name="$2"
+  aws route53 list-resource-record-sets \
+    --hosted-zone-id "${parent_zone_id}" \
+    --output json | jq -e --arg name "${child_zone_name}." \
+      '[.ResourceRecordSets[] | select(.Name == $name and .Type == "NS")] | length > 0' >/dev/null
+}
+
 hosted_zone_for_record() {
   local record_name="$1"
   local record_fqdn="${record_name%.}"
   local domain_fqdn="${DOMAIN_NAME%.}"
   local root_fqdn="${ROOT_DOMAIN_NAME%.}"
-  local zone_name
-  local zone_id
+  local root_zone_id
+  local domain_zone_id
 
-  if [[ "${record_fqdn}" == "${domain_fqdn}" || "${record_fqdn}" == *".${domain_fqdn}" ]]; then
-    zone_name="${domain_fqdn}."
-  elif [[ "${record_fqdn}" == "${root_fqdn}" || "${record_fqdn}" == *".${root_fqdn}" ]]; then
-    zone_name="${root_fqdn}."
-  else
+  if [[ "${record_fqdn}" != "${root_fqdn}" && "${record_fqdn}" != *".${root_fqdn}" ]]; then
     echo "The record ${record_name} is outside the approved DNS zones." >&2
     exit 1
   fi
 
-  zone_id="$(aws route53 list-hosted-zones-by-name \
-    --dns-name "${zone_name}" \
-    --output json | jq -r --arg zone "${zone_name}" \
-      '[.HostedZones[] | select(.Name == $zone and .Config.PrivateZone == false) | .Id] | first // empty')"
-  if [[ -z "${zone_id}" ]]; then
-    echo "Public Route 53 hosted zone ${zone_name} was not found in the approved AWS account." >&2
+  root_zone_id="$(hosted_zone_id_for_name "${root_fqdn}.")"
+  if [[ -z "${root_zone_id}" ]]; then
+    echo "Public Route 53 hosted zone ${root_fqdn}. was not found in the approved AWS account." >&2
     exit 1
   fi
-  printf '%s\n' "${zone_id##*/}"
+
+  if [[ "${domain_fqdn}" != "${root_fqdn}" && ("${record_fqdn}" == "${domain_fqdn}" || "${record_fqdn}" == *".${domain_fqdn}") ]]; then
+    domain_zone_id="$(hosted_zone_id_for_name "${domain_fqdn}.")"
+    if [[ -n "${domain_zone_id}" ]] && is_child_zone_delegated "${root_zone_id##*/}" "${domain_fqdn}"; then
+      printf '%s\n' "${domain_zone_id##*/}"
+      return
+    fi
+  fi
+
+  printf '%s\n' "${root_zone_id##*/}"
 }
 
 upsert_cname() {
