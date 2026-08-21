@@ -45,7 +45,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install validators
-        run: python -m pip install --disable-pip-check pyyaml jsonschema
+        run: python -m pip install --disable-pip-version-check pyyaml jsonschema
       - name: Validate specifications
         run: python scripts/validate_specs.py
       - name: Validate public copy
