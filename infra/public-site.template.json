@@ -26,6 +26,25 @@
       "Type": "String",
       "Description": "AWS Certificate Manager certificate ARN in us-east-1 covering DomainName.",
       "AllowedPattern": "^arn:[^:]+:acm:us-east-1:[0-9]{12}:certificate/[0-9a-f-]+$"
+    },
+    "PublishAlias": {
+      "Type": "String",
+      "Default": "false",
+      "AllowedValues": [
+        "true",
+        "false"
+      ],
+      "Description": "Attach DomainName to the distribution after the existing domain association has been transferred."
+    }
+  },
+  "Conditions": {
+    "PublishCustomDomain": {
+      "Fn::Equals": [
+        {
+          "Ref": "PublishAlias"
+        },
+        "true"
+      ]
     }
   },
   "Resources": {
@@ -137,11 +156,19 @@
               "ErrorCachingMinTTL": 60
             }
           ],
-          "Aliases": [
-            {
-              "Ref": "DomainName"
-            }
-          ],
+          "Aliases": {
+            "Fn::If": [
+              "PublishCustomDomain",
+              [
+                {
+                  "Ref": "DomainName"
+                }
+              ],
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
           "ViewerCertificate": {
             "AcmCertificateArn": {
               "Ref": "CertificateArn"
