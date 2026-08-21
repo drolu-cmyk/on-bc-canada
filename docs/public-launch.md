@@ -8,16 +8,24 @@ The `site/` directory contains the public pages. The public site has no learner 
 
 ## Web addresses
 
-The public site is available at:
+The canonical Canada address is:
+
+- https://canada.sozorock.com
+
+The legacy addresses remain available only as permanent redirects:
 
 - https://sozorock.ca
 - https://www.sozorock.ca
 
-The `www` address is the canonical web address used in page metadata and public references.
+Both legacy hosts preserve the requested path and query string when redirecting to `https://canada.sozorock.com`.
+
+## Hosting
+
+The public site uses a private S3 origin and CloudFront distribution. The application stack remains in AWS Canada Central (`ca-central-1`). The CloudFront certificate is managed in `us-east-1`, as required for CloudFront custom domains.
 
 ## Program boundary
 
-The training is free and virtual across Canada. Public participation information does not represent accreditation, a degree, diploma, professional licence, employment guarantee, immigration pathway, study-permit pathway, endorsement, affiliation, or competency credential.
+The training is free and virtual across Canada. Public participation information does not represent accreditation, a degree, diploma, professional licence, employment guarantee, immigration pathway, study permit pathway, endorsement, affiliation, or competency credential.
 
 ## Site quality
 
