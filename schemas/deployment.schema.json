@@ -4,9 +4,7 @@
   "title": "Public release deployment contract",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "deployment"
-  ],
+  "required": ["deployment"],
   "properties": {
     "deployment": {
       "type": "object",
@@ -22,24 +20,10 @@
         "automation"
       ],
       "properties": {
-        "deployment_id": {
-          "type": "string",
-          "pattern": "^[a-z0-9-]+$"
-        },
-        "version": {
-          "type": "string",
-          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
-        },
-        "status": {
-          "enum": [
-            "source_only",
-            "public_static",
-            "learner_services_enabled"
-          ]
-        },
-        "stack_region": {
-          "const": "ca-central-1"
-        },
+        "deployment_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "status": {"enum": ["source_only", "public_static", "learner_services_enabled"]},
+        "stack_region": {"const": "ca-central-1"},
         "public_site": {
           "type": "object",
           "additionalProperties": false,
@@ -53,151 +37,67 @@
             "allowed_methods",
             "canonical_origin",
             "domain_names",
-            "root_domain_name",
-            "domain_name",
+            "canonical_root_domain_name",
+            "canonical_domain_name",
+            "legacy_domain_names",
+            "legacy_redirect_status",
             "certificate_region"
           ],
           "properties": {
-            "source_directory": {
-              "const": "site"
-            },
-            "artifact_directory": {
-              "type": "string",
-              "minLength": 3
-            },
-            "template": {
-              "const": "infra/public-site.template.json"
-            },
-            "hosting": {
-              "const": "cloudfront_s3"
-            },
-            "data_collection": {
-              "enum": [
-                "disabled",
-                "controlled"
-              ]
-            },
-            "external_side_effects": {
-              "enum": [
-                "disabled",
-                "adapter_approved"
-              ]
-            },
-            "allowed_methods": {
-              "const": [
-                "GET",
-                "HEAD"
-              ]
-            },
-            "canonical_origin": {
-              "const": "https://www.sozorock.ca"
-            },
-            "domain_name": {
-              "const": "www.sozorock.ca"
-            },
-            "certificate_region": {
-              "const": "us-east-1"
-            },
+            "source_directory": {"const": "site"},
+            "artifact_directory": {"type": "string", "minLength": 3},
+            "template": {"const": "infra/public-site.template.json"},
+            "hosting": {"const": "cloudfront_s3"},
+            "data_collection": {"enum": ["disabled", "controlled"]},
+            "external_side_effects": {"enum": ["disabled", "adapter_approved"]},
+            "allowed_methods": {"const": ["GET", "HEAD"]},
+            "canonical_origin": {"const": "https://canada.sozorock.com"},
             "domain_names": {
-              "const": [
-                "sozorock.ca",
-                "www.sozorock.ca"
-              ]
+              "const": ["canada.sozorock.com", "sozorock.ca", "www.sozorock.ca"]
             },
-            "root_domain_name": {
-              "const": "sozorock.ca"
-            }
+            "canonical_root_domain_name": {"const": "sozorock.com"},
+            "canonical_domain_name": {"const": "canada.sozorock.com"},
+            "legacy_domain_names": {"const": ["sozorock.ca", "www.sozorock.ca"]},
+            "legacy_redirect_status": {"const": 301},
+            "certificate_region": {"const": "us-east-1"}
           }
         },
         "learner_services": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "status",
-            "intake",
-            "production_data",
-            "external_side_effects",
-            "reference_region"
-          ],
+          "required": ["status", "intake", "production_data", "external_side_effects", "reference_region"],
           "properties": {
-            "status": {
-              "enum": [
-                "disabled",
-                "sandbox",
-                "production"
-              ]
-            },
-            "intake": {
-              "enum": [
-                "disabled",
-                "controlled"
-              ]
-            },
-            "production_data": {
-              "enum": [
-                "disabled",
-                "controlled"
-              ]
-            },
-            "external_side_effects": {
-              "enum": [
-                "disabled",
-                "adapter_approved"
-              ]
-            },
-            "reference_region": {
-              "const": "ca-central-1"
-            }
+            "status": {"enum": ["disabled", "sandbox", "production"]},
+            "intake": {"enum": ["disabled", "controlled"]},
+            "production_data": {"enum": ["disabled", "controlled"]},
+            "external_side_effects": {"enum": ["disabled", "adapter_approved"]},
+            "reference_region": {"const": "ca-central-1"}
           }
         },
         "release_gate": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "automated_checks",
-            "human_authorization_role"
-          ],
+          "required": ["automated_checks", "human_authorization_role"],
           "properties": {
             "automated_checks": {
               "type": "array",
               "minItems": 1,
               "uniqueItems": true,
-              "items": {
-                "type": "string"
-              }
+              "items": {"type": "string"}
             },
-            "human_authorization_role": {
-              "type": "string",
-              "minLength": 2
-            }
+            "human_authorization_role": {"type": "string", "minLength": 2}
           }
         },
         "automation": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "workflow",
-            "authentication",
-            "account_id",
-            "region",
-            "trigger"
-          ],
+          "required": ["workflow", "authentication", "account_id", "region", "trigger"],
           "properties": {
-            "workflow": {
-              "const": ".github/workflows/public-site-deploy.yml"
-            },
-            "authentication": {
-              "const": "github_oidc"
-            },
-            "account_id": {
-              "const": "891377012881"
-            },
-            "region": {
-              "const": "ca-central-1"
-            },
-            "trigger": {
-              "const": "main_push"
-            }
+            "workflow": {"const": ".github/workflows/public-site-deploy.yml"},
+            "authentication": {"const": "github_oidc"},
+            "account_id": {"const": "891377012881"},
+            "region": {"const": "ca-central-1"},
+            "trigger": {"const": "main_push"}
           }
         }
       }
