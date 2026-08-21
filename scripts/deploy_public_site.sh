@@ -457,6 +457,7 @@ aws cloudfront wait invalidation-completed \
   --id "${invalidation_id}"
 
 transfer_domain_associations "${distribution_id}" "${distribution_domain}"
+aws cloudfront wait distribution-deployed --id "${distribution_id}"
 deploy_stack true
 aws cloudfront wait distribution-deployed --id "${distribution_id}"
 
