@@ -397,6 +397,22 @@ replace_with_cloudfront_alias() {
     --query "ChangeInfo.Id" \
     --output text)"
   aws route53 wait resource-record-sets-changed --id "${change_id}"
+
+  if ! aws route53 list-resource-record-sets \
+    --hosted-zone-id "${hosted_zone_id}" \
+    --output json | jq -e --arg name "${record_name}" \
+      --arg dns_name "${target_dns_name}" \
+      --arg cloudfront_zone "${CLOUDFRONT_ALIAS_ZONE_ID}" '
+        [.ResourceRecordSets[]
+          | select(.Name == $name and (.Type == "A" or .Type == "AAAA"))
+          | select(.AliasTarget.HostedZoneId == $cloudfront_zone)
+          | select((.AliasTarget.DNSName | ascii_downcase | rtrimstr(".")) == ($dns_name | ascii_downcase | rtrimstr(".")))
+          | .Type]
+        | index("A") != null and index("AAAA") != null
+      ' >/dev/null; then
+    echo "Route 53 did not publish both CloudFront alias records at ${record_name}." >&2
+    exit 1
+  fi
 }
 
 cleanup_failed_stack
