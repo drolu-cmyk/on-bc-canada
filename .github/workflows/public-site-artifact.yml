@@ -29,7 +29,6 @@ jobs:
         run: |
           mkdir -p dist/public-site
           cp -R site/. dist/public-site/
-          cp config/deployment.yaml dist/public-site/deployment-record.yaml
       - name: Upload static artifact
         uses: actions/upload-artifact@v4
         with:
