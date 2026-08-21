@@ -28,8 +28,10 @@ env:
   AWS_ACCOUNT_ID: "891377012881"
   AWS_REGION: ca-central-1
   CERTIFICATE_REGION: us-east-1
-  ROOT_DOMAIN_NAME: sozorock.ca
-  DOMAIN_NAME: www.sozorock.ca
+  CANONICAL_ROOT_DOMAIN: sozorock.com
+  CANONICAL_DOMAIN: canada.sozorock.com
+  LEGACY_ROOT_DOMAIN: sozorock.ca
+  LEGACY_WWW_DOMAIN: www.sozorock.ca
   STACK_NAME: sozorock-ca-public-site
   PUBLIC_SITE_BUCKET_NAME: ${{ vars.PUBLIC_SITE_BUCKET_NAME || 'sozorock-ca-public-site-891377012881' }}
 
@@ -59,7 +61,7 @@ jobs:
         run: bash -n scripts/deploy_public_site.sh
 
   deploy:
-    if: github.ref == 'refs/heads/main' && vars.PUBLIC_SITE_DEPLOYMENT_ENABLED == 'true'
+    if: github.ref == 'refs/heads/main' && vars.PUBLIC_SITE_DEPLOYMENT_ENABLED == 'true' && vars.CANADA_DOMAIN_MIGRATION_ENABLED == 'true'
     needs: validate
     runs-on: ubuntu-latest
     permissions:
@@ -79,8 +81,10 @@ jobs:
           AWS_ACCOUNT_ID: "891377012881"
           AWS_REGION: ca-central-1
           CERTIFICATE_REGION: us-east-1
-          ROOT_DOMAIN_NAME: sozorock.ca
-          DOMAIN_NAME: www.sozorock.ca
+          CANONICAL_ROOT_DOMAIN: sozorock.com
+          CANONICAL_DOMAIN: canada.sozorock.com
+          LEGACY_ROOT_DOMAIN: sozorock.ca
+          LEGACY_WWW_DOMAIN: www.sozorock.ca
           STACK_NAME: sozorock-ca-public-site
           PUBLIC_SITE_BUCKET_NAME: ${{ vars.PUBLIC_SITE_BUCKET_NAME || 'sozorock-ca-public-site-891377012881' }}
         run: ./scripts/deploy_public_site.sh

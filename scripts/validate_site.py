@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 SITE = Path("site")
-CANONICAL_ORIGIN = "https://www.sozorock.ca"
+CANONICAL_ORIGIN = "https://canada.sozorock.com"
 CONTENT_PAGES = {
     "index.html",
     "program.html",
@@ -60,6 +60,8 @@ def main() -> int:
             for required in required_metadata:
                 if required not in source:
                     errors.append(f"{path}: missing {required}")
+            if "sozorock.ca" in source:
+                errors.append(f"{path}: legacy .ca hostname must not appear in canonical public content")
         elif '<meta name="robots" content="noindex">' not in source:
             errors.append(f"{path}: missing noindex directive")
 
@@ -80,6 +82,8 @@ def main() -> int:
         sitemap_url = f"Sitemap: {CANONICAL_ORIGIN}/sitemap.xml"
         if sitemap_url not in robots:
             errors.append(f"site/robots.txt: missing {sitemap_url}")
+        if "sozorock.ca" in robots:
+            errors.append("site/robots.txt: legacy .ca hostname must not be advertised")
 
     sitemap_path = SITE / "sitemap.xml"
     if not sitemap_path.is_file():
@@ -90,13 +94,15 @@ def main() -> int:
             expected_url = f"<loc>{CANONICAL_ORIGIN}{canonical_path(page_name)}</loc>"
             if expected_url not in sitemap:
                 errors.append(f"site/sitemap.xml: missing {expected_url}")
+        if "sozorock.ca" in sitemap:
+            errors.append("site/sitemap.xml: legacy .ca hostname must not be indexed")
 
     if errors:
         print("Static site validation failed:", file=sys.stderr)
         print("\n".join(errors), file=sys.stderr)
         return 1
 
-    print(f"Static site validation passed for {len(pages)} pages.")
+    print(f"Static site validation passed for {len(pages)} pages on {CANONICAL_ORIGIN}.")
     return 0
 
 

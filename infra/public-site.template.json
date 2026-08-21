@@ -1,6 +1,6 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "Private S3 origin and CloudFront distribution for the Applied AI Training for Canada public information shell.",
+  "Description": "Private S3 origin and CloudFront distribution for the SozoRock Canada public site.",
   "Parameters": {
     "PublicSiteBucketName": {
       "Type": "String",
@@ -10,47 +10,41 @@
     "PriceClass": {
       "Type": "String",
       "Default": "PriceClass_100",
-      "AllowedValues": [
-        "PriceClass_100",
-        "PriceClass_200",
-        "PriceClass_All"
-      ]
+      "AllowedValues": ["PriceClass_100", "PriceClass_200", "PriceClass_All"]
     },
-    "DomainName": {
+    "CanonicalDomainName": {
+      "Type": "String",
+      "Default": "canada.sozorock.com",
+      "Description": "Canonical hostname for the Canada public site.",
+      "AllowedPattern": "^[a-z0-9.-]+$"
+    },
+    "LegacyRootDomainName": {
+      "Type": "String",
+      "Default": "sozorock.ca",
+      "Description": "Legacy apex hostname retained for permanent redirects.",
+      "AllowedPattern": "^[a-z0-9.-]+$"
+    },
+    "LegacyWwwDomainName": {
       "Type": "String",
       "Default": "www.sozorock.ca",
-      "Description": "Public hostname served by the CloudFront distribution.",
+      "Description": "Legacy www hostname retained for permanent redirects.",
       "AllowedPattern": "^[a-z0-9.-]+$"
     },
     "CertificateArn": {
       "Type": "String",
-      "Description": "AWS Certificate Manager certificate ARN in us-east-1 covering the apex and www hostnames.",
+      "Description": "AWS Certificate Manager certificate ARN in us-east-1 covering the canonical and legacy hostnames.",
       "AllowedPattern": "^arn:[^:]+:acm:us-east-1:[0-9]{12}:certificate/[0-9a-f-]+$"
     },
     "PublishAlias": {
       "Type": "String",
       "Default": "false",
-      "AllowedValues": [
-        "true",
-        "false"
-      ],
-      "Description": "Attach both public hostnames to the distribution after each existing domain association has been transferred."
-    },
-    "RootDomainName": {
-      "Type": "String",
-      "Default": "sozorock.ca",
-      "Description": "Apex hostname served by the CloudFront distribution.",
-      "AllowedPattern": "^[a-z0-9.-]+$"
+      "AllowedValues": ["true", "false"],
+      "Description": "Attach the canonical and legacy hostnames after any external CloudFront associations have been transferred."
     }
   },
   "Conditions": {
     "PublishCustomDomain": {
-      "Fn::Equals": [
-        {
-          "Ref": "PublishAlias"
-        },
-        "true"
-      ]
+      "Fn::Equals": [{"Ref": "PublishAlias"}, "true"]
     }
   },
   "Resources": {
@@ -59,48 +53,44 @@
       "DeletionPolicy": "Retain",
       "UpdateReplacePolicy": "Retain",
       "Properties": {
-        "BucketName": {
-          "Ref": "PublicSiteBucketName"
-        },
+        "BucketName": {"Ref": "PublicSiteBucketName"},
         "BucketEncryption": {
           "ServerSideEncryptionConfiguration": [
-            {
-              "ServerSideEncryptionByDefault": {
-                "SSEAlgorithm": "AES256"
-              }
-            }
+            {"ServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}
           ]
         },
-        "OwnershipControls": {
-          "Rules": [
-            {
-              "ObjectOwnership": "BucketOwnerEnforced"
-            }
-          ]
-        },
+        "OwnershipControls": {"Rules": [{"ObjectOwnership": "BucketOwnerEnforced"}]},
         "PublicAccessBlockConfiguration": {
           "BlockPublicAcls": true,
           "BlockPublicPolicy": true,
           "IgnorePublicAcls": true,
           "RestrictPublicBuckets": true
         },
-        "VersioningConfiguration": {
-          "Status": "Enabled"
-        }
+        "VersioningConfiguration": {"Status": "Enabled"}
       }
     },
     "PublicSiteOriginAccessControl": {
       "Type": "AWS::CloudFront::OriginAccessControl",
       "Properties": {
         "OriginAccessControlConfig": {
-          "Name": {
-            "Fn::Sub": "${AWS::StackName}-public-site-oac"
-          },
-          "Description": "SigV4 access from CloudFront to the private public-site bucket.",
+          "Name": {"Fn::Sub": "${AWS::StackName}-public-site-oac"},
+          "Description": "SigV4 access from CloudFront to the private Canada public-site bucket.",
           "OriginAccessControlOriginType": "s3",
           "SigningBehavior": "always",
           "SigningProtocol": "sigv4"
         }
+      }
+    },
+    "LegacyDomainRedirectFunction": {
+      "Type": "AWS::CloudFront::Function",
+      "Properties": {
+        "AutoPublish": true,
+        "Name": {"Fn::Sub": "${AWS::StackName}-legacy-domain-redirect"},
+        "FunctionConfig": {
+          "Comment": "Permanently redirect sozorock.ca and www.sozorock.ca to canada.sozorock.com while preserving path and query string.",
+          "Runtime": "cloudfront-js-2.0"
+        },
+        "FunctionCode": "function queryString(q) {\n  var parts = [];\n  for (var key in q) {\n    if (!Object.prototype.hasOwnProperty.call(q, key)) continue;\n    var item = q[key];\n    if (item.multiValue) {\n      for (var i = 0; i < item.multiValue.length; i++) {\n        parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(item.multiValue[i].value || ''));\n      }\n    } else {\n      parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(item.value || ''));\n    }\n  }\n  return parts.length ? '?' + parts.join('&') : '';\n}\n\nfunction handler(event) {\n  var request = event.request;\n  var host = request.headers.host ? request.headers.host.value.toLowerCase() : '';\n  if (host === 'sozorock.ca' || host === 'www.sozorock.ca') {\n    return {\n      statusCode: 301,\n      statusDescription: 'Moved Permanently',\n      headers: {\n        location: { value: 'https://canada.sozorock.com' + request.uri + queryString(request.querystring) },\n        'cache-control': { value: 'public, max-age=3600' }\n      }\n    };\n  }\n  return request;\n}\n"
       }
     },
     "PublicSiteDistribution": {
@@ -108,80 +98,52 @@
       "Properties": {
         "DistributionConfig": {
           "Enabled": true,
-          "Comment": "Applied AI Training for Canada public information shell",
+          "Comment": "SozoRock Canada public site",
           "DefaultRootObject": "index.html",
           "HttpVersion": "http2and3",
-          "PriceClass": {
-            "Ref": "PriceClass"
-          },
+          "PriceClass": {"Ref": "PriceClass"},
           "Origins": [
             {
               "Id": "PublicSiteOrigin",
-              "DomainName": {
-                "Fn::GetAtt": [
-                  "PublicSiteBucket",
-                  "RegionalDomainName"
-                ]
-              },
+              "DomainName": {"Fn::GetAtt": ["PublicSiteBucket", "RegionalDomainName"]},
               "S3OriginConfig": {},
-              "OriginAccessControlId": {
-                "Ref": "PublicSiteOriginAccessControl"
-              }
+              "OriginAccessControlId": {"Ref": "PublicSiteOriginAccessControl"}
             }
           ],
           "DefaultCacheBehavior": {
             "TargetOriginId": "PublicSiteOrigin",
             "ViewerProtocolPolicy": "redirect-to-https",
-            "AllowedMethods": [
-              "GET",
-              "HEAD"
-            ],
-            "CachedMethods": [
-              "GET",
-              "HEAD"
-            ],
+            "AllowedMethods": ["GET", "HEAD"],
+            "CachedMethods": ["GET", "HEAD"],
             "Compress": true,
             "ForwardedValues": {
               "QueryString": false,
-              "Cookies": {
-                "Forward": "none"
+              "Cookies": {"Forward": "none"}
+            },
+            "FunctionAssociations": [
+              {
+                "EventType": "viewer-request",
+                "FunctionARN": {"Fn::GetAtt": ["LegacyDomainRedirectFunction", "FunctionARN"]}
               }
-            }
+            ]
           },
           "CustomErrorResponses": [
-            {
-              "ErrorCode": 403,
-              "ResponseCode": 404,
-              "ResponsePagePath": "/404.html",
-              "ErrorCachingMinTTL": 60
-            },
-            {
-              "ErrorCode": 404,
-              "ResponseCode": 404,
-              "ResponsePagePath": "/404.html",
-              "ErrorCachingMinTTL": 60
-            }
+            {"ErrorCode": 403, "ResponseCode": 404, "ResponsePagePath": "/404.html", "ErrorCachingMinTTL": 60},
+            {"ErrorCode": 404, "ResponseCode": 404, "ResponsePagePath": "/404.html", "ErrorCachingMinTTL": 60}
           ],
           "Aliases": {
             "Fn::If": [
               "PublishCustomDomain",
               [
-                {
-                  "Ref": "RootDomainName"
-                },
-                {
-                  "Ref": "DomainName"
-                }
+                {"Ref": "CanonicalDomainName"},
+                {"Ref": "LegacyRootDomainName"},
+                {"Ref": "LegacyWwwDomainName"}
               ],
-              {
-                "Ref": "AWS::NoValue"
-              }
+              {"Ref": "AWS::NoValue"}
             ]
           },
           "ViewerCertificate": {
-            "AcmCertificateArn": {
-              "Ref": "CertificateArn"
-            },
+            "AcmCertificateArn": {"Ref": "CertificateArn"},
             "SslSupportMethod": "sni-only",
             "MinimumProtocolVersion": "TLSv1.2_2021"
           },
@@ -192,27 +154,19 @@
     "PublicSiteBucketPolicy": {
       "Type": "AWS::S3::BucketPolicy",
       "Properties": {
-        "Bucket": {
-          "Ref": "PublicSiteBucket"
-        },
+        "Bucket": {"Ref": "PublicSiteBucket"},
         "PolicyDocument": {
           "Version": "2012-10-17",
           "Statement": [
             {
               "Sid": "AllowCloudFrontReadOnly",
               "Effect": "Allow",
-              "Principal": {
-                "Service": "cloudfront.amazonaws.com"
-              },
+              "Principal": {"Service": "cloudfront.amazonaws.com"},
               "Action": "s3:GetObject",
-              "Resource": {
-                "Fn::Sub": "${PublicSiteBucket.Arn}/*"
-              },
+              "Resource": {"Fn::Sub": "${PublicSiteBucket.Arn}/*"},
               "Condition": {
                 "StringEquals": {
-                  "AWS:SourceArn": {
-                    "Fn::Sub": "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${PublicSiteDistribution}"
-                  }
+                  "AWS:SourceArn": {"Fn::Sub": "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${PublicSiteDistribution}"}
                 }
               }
             }
@@ -224,30 +178,19 @@
   "Outputs": {
     "PublicSiteBucket": {
       "Description": "Private S3 bucket for the public information artifact.",
-      "Value": {
-        "Ref": "PublicSiteBucket"
-      }
+      "Value": {"Ref": "PublicSiteBucket"}
     },
     "PublicSiteDistributionId": {
       "Description": "CloudFront distribution identifier.",
-      "Value": {
-        "Ref": "PublicSiteDistribution"
-      }
+      "Value": {"Ref": "PublicSiteDistribution"}
     },
     "PublicSiteDomainName": {
       "Description": "CloudFront distribution domain name.",
-      "Value": {
-        "Fn::GetAtt": [
-          "PublicSiteDistribution",
-          "DomainName"
-        ]
-      }
+      "Value": {"Fn::GetAtt": ["PublicSiteDistribution", "DomainName"]}
     },
     "PublicSiteCanonicalDomain": {
-      "Description": "Configured public hostname.",
-      "Value": {
-        "Ref": "DomainName"
-      }
+      "Description": "Configured canonical Canada hostname.",
+      "Value": {"Ref": "CanonicalDomainName"}
     }
   }
 }
