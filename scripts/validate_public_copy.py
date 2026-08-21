@@ -17,7 +17,6 @@ PUBLIC_FILES = [
     Path("runtime/README.md"),
     *sorted(Path("docs").glob("*.md")),
     *sorted(Path("site").glob("*.html")),
-    *sorted(Path("config").glob("*.yaml")),
     *sorted(Path("policies").glob("*.yaml")),
     *sorted(Path("content/modules").glob("*.yaml")),
 ]
