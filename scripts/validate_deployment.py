@@ -17,7 +17,9 @@ except ModuleNotFoundError:
 
 ROOT = Path(__file__).resolve().parents[1]
 CANONICAL_ORIGIN = "https://www.sozorock.ca"
+ROOT_DOMAIN = "sozorock.ca"
 CANONICAL_DOMAIN = "www.sozorock.ca"
+PUBLIC_DOMAINS = [ROOT_DOMAIN, CANONICAL_DOMAIN]
 CERTIFICATE_REGION = "us-east-1"
 AUTOMATION_WORKFLOW = ".github/workflows/public-site-deploy.yml"
 AWS_ACCOUNT_ID = "891377012881"
@@ -52,6 +54,8 @@ def validate_template() -> list[str]:
     resources = template.get("Resources", {})
     parameters = template.get("Parameters", {})
     errors: list[str] = []
+    if parameters.get("RootDomainName", {}).get("Default") != ROOT_DOMAIN:
+        errors.append("CloudFront RootDomainName default must be sozorock.ca")
     if parameters.get("DomainName", {}).get("Default") != CANONICAL_DOMAIN:
         errors.append("CloudFront DomainName default must be www.sozorock.ca")
     if parameters.get("CertificateArn", {}).get("Type") != "String":
@@ -86,10 +90,10 @@ def validate_template() -> list[str]:
     aliases = distribution_config.get("Aliases", {})
     if aliases.get("Fn::If") != [
         "PublishCustomDomain",
-        [{"Ref": "DomainName"}],
+        [{"Ref": "RootDomainName"}, {"Ref": "DomainName"}],
         {"Ref": "AWS::NoValue"},
     ]:
-        errors.append("CloudFront must conditionally attach the canonical hostname through DomainName")
+        errors.append("CloudFront must conditionally attach the apex and www hostnames")
     viewer_certificate = distribution_config.get("ViewerCertificate", {})
     if viewer_certificate.get("AcmCertificateArn") != {"Ref": "CertificateArn"}:
         errors.append("CloudFront must use the supplied ACM certificate")
@@ -97,6 +101,8 @@ def validate_template() -> list[str]:
         errors.append("CloudFront custom-domain TLS must use SNI")
     if viewer_certificate.get("MinimumProtocolVersion") != "TLSv1.2_2021":
         errors.append("CloudFront custom-domain TLS must require TLS 1.2")
+    if distribution_config.get("IsIPV6Enabled") is not True:
+        errors.append("CloudFront IPv6 must be enabled")
     if distribution_config.get("DefaultRootObject") != "index.html":
         errors.append("CloudFront default root object must be index.html")
     behavior = distribution_config.get("DefaultCacheBehavior", {})
@@ -126,6 +132,10 @@ def validate_source_boundary() -> list[str]:
     public_site = deployment.get("public_site", {})
     if public_site.get("canonical_origin") != CANONICAL_ORIGIN:
         errors.append("public_site.canonical_origin must be https://www.sozorock.ca")
+    if public_site.get("domain_names") != PUBLIC_DOMAINS:
+        errors.append("public_site.domain_names must include sozorock.ca and www.sozorock.ca")
+    if public_site.get("root_domain_name") != ROOT_DOMAIN:
+        errors.append("public_site.root_domain_name must be sozorock.ca")
     if public_site.get("domain_name") != CANONICAL_DOMAIN:
         errors.append("public_site.domain_name must be www.sozorock.ca")
     if public_site.get("certificate_region") != CERTIFICATE_REGION:

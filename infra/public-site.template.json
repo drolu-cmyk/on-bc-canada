@@ -24,7 +24,7 @@
     },
     "CertificateArn": {
       "Type": "String",
-      "Description": "AWS Certificate Manager certificate ARN in us-east-1 covering DomainName.",
+      "Description": "AWS Certificate Manager certificate ARN in us-east-1 covering the apex and www hostnames.",
       "AllowedPattern": "^arn:[^:]+:acm:us-east-1:[0-9]{12}:certificate/[0-9a-f-]+$"
     },
     "PublishAlias": {
@@ -34,7 +34,13 @@
         "true",
         "false"
       ],
-      "Description": "Attach DomainName to the distribution after the existing domain association has been transferred."
+      "Description": "Attach both public hostnames to the distribution after each existing domain association has been transferred."
+    },
+    "RootDomainName": {
+      "Type": "String",
+      "Default": "sozorock.ca",
+      "Description": "Apex hostname served by the CloudFront distribution.",
+      "AllowedPattern": "^[a-z0-9.-]+$"
     }
   },
   "Conditions": {
@@ -161,6 +167,9 @@
               "PublishCustomDomain",
               [
                 {
+                  "Ref": "RootDomainName"
+                },
+                {
                   "Ref": "DomainName"
                 }
               ],
@@ -175,7 +184,8 @@
             },
             "SslSupportMethod": "sni-only",
             "MinimumProtocolVersion": "TLSv1.2_2021"
-          }
+          },
+          "IsIPV6Enabled": true
         }
       }
     },

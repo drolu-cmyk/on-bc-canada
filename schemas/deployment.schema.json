@@ -52,6 +52,8 @@
             "external_side_effects",
             "allowed_methods",
             "canonical_origin",
+            "domain_names",
+            "root_domain_name",
             "domain_name",
             "certificate_region"
           ],
@@ -95,6 +97,15 @@
             },
             "certificate_region": {
               "const": "us-east-1"
+            },
+            "domain_names": {
+              "const": [
+                "sozorock.ca",
+                "www.sozorock.ca"
+              ]
+            },
+            "root_domain_name": {
+              "const": "sozorock.ca"
             }
           }
         },
