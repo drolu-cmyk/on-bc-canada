@@ -5,6 +5,7 @@ set -euo pipefail
 : "${AWS_REGION:=ca-central-1}"
 : "${CERTIFICATE_REGION:=us-east-1}"
 : "${DOMAIN_NAME:=www.sozorock.ca}"
+: "${ROOT_DOMAIN_NAME:=sozorock.ca}"
 : "${STACK_NAME:=sozorock-ca-public-site}"
 : "${PUBLIC_SITE_BUCKET_NAME:?PUBLIC_SITE_BUCKET_NAME is required}"
 
@@ -61,31 +62,99 @@ cleanup_failed_stack() {
 
 cleanup_failed_stack
 
-hosted_zone_id=""
-ensure_hosted_zone() {
-  if [[ -n "${hosted_zone_id}" ]]; then
-    return
+stack_status="$(aws cloudformation describe-stacks \
+  --region "${AWS_REGION}" \
+  --stack-name "${STACK_NAME}" \
+  --query "Stacks[0].StackStatus" \
+  --output text 2>/dev/null || true)"
+publish_alias="false"
+if [[ -n "${stack_status}" && "${stack_status}" != "None" ]]; then
+  publish_alias="$(aws cloudformation describe-stacks \
+    --region "${AWS_REGION}" \
+    --stack-name "${STACK_NAME}" \
+    --query "Stacks[0].Parameters[?ParameterKey=='PublishAlias'].ParameterValue | [0]" \
+    --output text 2>/dev/null || true)"
+  if [[ -z "${publish_alias}" || "${publish_alias}" == "None" ]]; then
+    publish_alias="true"
   fi
-  hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
-    --dns-name "sozorock.ca." \
-    --query "HostedZones[?Name=='sozorock.ca.'].Id | [0]" \
-    --output text)"
-  if [[ -z "${hosted_zone_id}" || "${hosted_zone_id}" == "None" ]]; then
-    echo "Route 53 hosted zone sozorock.ca. was not found in the approved AWS account." >&2
+fi
+
+hosted_zone_for_record() {
+  local record_name="$1"
+  local record_fqdn="${record_name%.}"
+  local domain_fqdn="${DOMAIN_NAME%.}"
+  local root_fqdn="${ROOT_DOMAIN_NAME%.}"
+  local zone_name
+  local zone_id
+
+  if [[ "${record_fqdn}" == "${domain_fqdn}" || "${record_fqdn}" == *".${domain_fqdn}" ]]; then
+    zone_name="${domain_fqdn}."
+  elif [[ "${record_fqdn}" == "${root_fqdn}" || "${record_fqdn}" == *".${root_fqdn}" ]]; then
+    zone_name="${root_fqdn}."
+  else
+    echo "The record ${record_name} is outside the approved DNS zones." >&2
     exit 1
   fi
-  hosted_zone_id="${hosted_zone_id##*/}"
+
+  zone_id="$(aws route53 list-hosted-zones-by-name \
+    --dns-name "${zone_name}" \
+    --output json | jq -r --arg zone "${zone_name}" \
+      '[.HostedZones[] | select(.Name == $zone and .Config.PrivateZone == false) | .Id] | first // empty')"
+  if [[ -z "${zone_id}" ]]; then
+    echo "Public Route 53 hosted zone ${zone_name} was not found in the approved AWS account." >&2
+    exit 1
+  fi
+  printf '%s\n' "${zone_id##*/}"
 }
 
 upsert_cname() {
   local record_name="$1"
   local record_value="$2"
+  local hosted_zone_id
   local change_batch
   local change_id
+  hosted_zone_id="$(hosted_zone_for_record "${record_name}")"
   change_batch="$(jq -cn \
     --arg name "${record_name}" \
     --arg value "${record_value}" \
     '{Changes:[{Action:"UPSERT",ResourceRecordSet:{Name:$name,Type:"CNAME",TTL:300,ResourceRecords:[{Value:$value}]}}]}')"
+  change_id="$(aws route53 change-resource-record-sets \
+    --hosted-zone-id "${hosted_zone_id}" \
+    --change-batch "${change_batch}" \
+    --query "ChangeInfo.Id" \
+    --output text)"
+  aws route53 wait resource-record-sets-changed --id "${change_id}"
+}
+
+upsert_txt() {
+  local record_name="$1"
+  local record_value="$2"
+  local hosted_zone_id
+  local existing_record
+  local record_values
+  local ttl
+  local change_batch
+  local change_id
+
+  hosted_zone_id="$(hosted_zone_for_record "${record_name}")"
+  existing_record="$(aws route53 list-resource-record-sets \
+    --hosted-zone-id "${hosted_zone_id}" \
+    --output json | jq -c --arg name "${record_name}" \
+      '[.ResourceRecordSets[] | select(.Name == $name and .Type == "TXT")][0] // empty')"
+  if [[ -n "${existing_record}" ]]; then
+    record_values="$(jq -c --arg value "${record_value}" \
+      '((.ResourceRecords // []) | map(.Value) + [$value] | unique | map({Value:.}))' \
+      <<<"${existing_record}")"
+    ttl="$(jq -r '.TTL // 300' <<<"${existing_record}")"
+  else
+    record_values="$(jq -cn --arg value "${record_value}" '[{Value:$value}]')"
+    ttl="300"
+  fi
+  change_batch="$(jq -cn \
+    --arg name "${record_name}" \
+    --argjson ttl "${ttl}" \
+    --argjson records "${record_values}" \
+    '{Changes:[{Action:"UPSERT",ResourceRecordSet:{Name:$name,Type:"TXT",TTL:$ttl,ResourceRecords:$records}}]}')"
   change_id="$(aws route53 change-resource-record-sets \
     --hosted-zone-id "${hosted_zone_id}" \
     --change-batch "${change_batch}" \
@@ -128,7 +197,6 @@ ensure_certificate() {
     return
   fi
 
-  ensure_hosted_zone
   for attempt in $(seq 1 60); do
     validation="$(aws acm describe-certificate \
       --region "${CERTIFICATE_REGION}" \
@@ -191,6 +259,7 @@ aws cloudformation deploy \
     "PublicSiteBucketName=${PUBLIC_SITE_BUCKET_NAME}" \
     "DomainName=${DOMAIN_NAME}" \
     "CertificateArn=${CERTIFICATE_ARN}" \
+    "PublishAlias=${publish_alias}" \
     "PriceClass=PriceClass_100"
 
 distribution_id="$(aws cloudformation describe-stacks \
@@ -209,6 +278,53 @@ if [[ -z "${distribution_id}" || "${distribution_id}" == "None" || -z "${distrib
   exit 1
 fi
 
+distribution_has_alias() {
+  local target_distribution_id="$1"
+  aws cloudfront get-distribution-config \
+    --id "${target_distribution_id}" \
+    --output json | jq -e --arg domain "${DOMAIN_NAME}" \
+      '((.DistributionConfig.Aliases.Items // []) | index($domain)) != null' >/dev/null
+}
+
+transfer_domain_association() {
+  local target_distribution_id="$1"
+  local target_distribution_domain="$2"
+  local conflicts
+  local conflict_count
+  local target_etag
+  local transfer_output
+
+  if distribution_has_alias "${target_distribution_id}"; then
+    publish_alias="true"
+    return
+  fi
+
+  conflicts="$(aws cloudfront list-domain-conflicts \
+    --domain "${DOMAIN_NAME}" \
+    --domain-control-validation-resource "DistributionId=${target_distribution_id}" \
+    --output json)"
+  conflict_count="$(jq '(.DomainConflicts // []) | length' <<<"${conflicts}")"
+  if [[ "${conflict_count}" != "0" ]]; then
+    echo "Existing CloudFront domain association detected; registering target ownership proof."
+    upsert_txt "_${DOMAIN_NAME}." "\"${target_distribution_domain}\""
+    target_etag="$(aws cloudfront get-distribution-config \
+      --id "${target_distribution_id}" \
+      --query ETag \
+      --output text)"
+    if ! transfer_output="$(aws cloudfront update-domain-association \
+      --domain "${DOMAIN_NAME}" \
+      --target-resource "DistributionId=${target_distribution_id}" \
+      --if-match "${target_etag}" 2>&1)"; then
+      echo "CloudFront could not transfer ${DOMAIN_NAME} to the target distribution." >&2
+      echo "${transfer_output}" >&2
+      echo "The source distribution must be disabled, or AWS Support must complete the transfer." >&2
+      exit 1
+    fi
+  fi
+
+  publish_alias="true"
+}
+
 aws s3 sync site/ "s3://${PUBLIC_SITE_BUCKET_NAME}" \
   --region "${AWS_REGION}" \
   --delete \
@@ -223,7 +339,22 @@ invalidation_id="$(aws cloudfront create-invalidation \
   --output text)"
 aws cloudfront wait invalidation-completed --distribution-id "${distribution_id}" --id "${invalidation_id}"
 
-ensure_hosted_zone
+transfer_domain_association "${distribution_id}" "${distribution_domain}"
+if [[ "${publish_alias}" == "true" ]]; then
+  aws cloudformation deploy \
+    --region "${AWS_REGION}" \
+    --stack-name "${STACK_NAME}" \
+    --template-file infra/public-site.template.json \
+    --no-fail-on-empty-changeset \
+    --parameter-overrides \
+      "PublicSiteBucketName=${PUBLIC_SITE_BUCKET_NAME}" \
+      "DomainName=${DOMAIN_NAME}" \
+      "CertificateArn=${CERTIFICATE_ARN}" \
+      "PublishAlias=true" \
+      "PriceClass=PriceClass_100"
+  aws cloudfront wait distribution-deployed --id "${distribution_id}"
+fi
+
 upsert_cname "${DOMAIN_NAME}." "${distribution_domain}"
 
 printf 'Published https://${DOMAIN_NAME}\n'

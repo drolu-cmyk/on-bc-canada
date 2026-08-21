@@ -153,8 +153,10 @@
                     "cloudfront:GetInvalidation",
                     "cloudfront:GetOriginAccessControl",
                     "cloudfront:ListDistributions",
+                    "cloudfront:ListDomainConflicts",
                     "cloudfront:ListOriginAccessControls",
                     "cloudfront:TagResource",
+                    "cloudfront:UpdateDomainAssociation",
                     "cloudfront:UpdateDistribution",
                     "cloudfront:UpdateOriginAccessControl"
                   ],

@@ -56,6 +56,9 @@ def validate_template() -> list[str]:
         errors.append("CloudFront DomainName default must be www.sozorock.ca")
     if parameters.get("CertificateArn", {}).get("Type") != "String":
         errors.append("CloudFront CertificateArn parameter is required")
+    publish_alias = parameters.get("PublishAlias", {})
+    if publish_alias.get("Type") != "String" or publish_alias.get("Default") != "false":
+        errors.append("CloudFront PublishAlias must default to false for transfer-safe provisioning")
     required_types = {
         "PublicSiteBucket": "AWS::S3::Bucket",
         "PublicSiteOriginAccessControl": "AWS::CloudFront::OriginAccessControl",
@@ -80,8 +83,13 @@ def validate_template() -> list[str]:
 
     distribution = resources.get("PublicSiteDistribution", {})
     distribution_config = distribution.get("Properties", {}).get("DistributionConfig", {})
-    if distribution_config.get("Aliases") != [{"Ref": "DomainName"}]:
-        errors.append("CloudFront must serve the canonical hostname through DomainName")
+    aliases = distribution_config.get("Aliases", {})
+    if aliases.get("Fn::If") != [
+        "PublishCustomDomain",
+        [{"Ref": "DomainName"}],
+        {"Ref": "AWS::NoValue"},
+    ]:
+        errors.append("CloudFront must conditionally attach the canonical hostname through DomainName")
     viewer_certificate = distribution_config.get("ViewerCertificate", {})
     if viewer_certificate.get("AcmCertificateArn") != {"Ref": "CertificateArn"}:
         errors.append("CloudFront must use the supplied ACM certificate")
