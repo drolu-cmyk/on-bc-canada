@@ -83,7 +83,7 @@ def validate_template() -> list[str]:
     if distribution_config.get("Aliases") != [{"Ref": "DomainName"}]:
         errors.append("CloudFront must serve the canonical hostname through DomainName")
     viewer_certificate = distribution_config.get("ViewerCertificate", {})
-    if viewer_certificate.get("AcmCertificate") != {"Ref": "CertificateArn"}:
+    if viewer_certificate.get("AcmCertificateArn") != {"Ref": "CertificateArn"}:
         errors.append("CloudFront must use the supplied ACM certificate")
     if viewer_certificate.get("SslSupportMethod") != "sni-only":
         errors.append("CloudFront custom-domain TLS must use SNI")
