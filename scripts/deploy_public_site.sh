@@ -17,6 +17,46 @@ if [[ "${actual_account}" != "${AWS_ACCOUNT_ID}" ]]; then
   exit 1
 fi
 
+cleanup_failed_stack() {
+  local stack_status
+  local object_count
+  stack_status="$(aws cloudformation describe-stacks \
+    --region "${AWS_REGION}" \
+    --stack-name "${STACK_NAME}" \
+    --query "Stacks[0].StackStatus" \
+    --output text 2>/dev/null || true)"
+  if [[ "${stack_status}" != "ROLLBACK_COMPLETE" ]]; then
+    return
+  fi
+
+  echo "Removing the empty ROLLBACK_COMPLETE deployment stack."
+  aws cloudformation delete-stack \
+    --region "${AWS_REGION}" \
+    --stack-name "${STACK_NAME}"
+  aws cloudformation wait stack-delete-complete \
+    --region "${AWS_REGION}" \
+    --stack-name "${STACK_NAME}"
+
+  if ! object_count="$(aws s3api list-objects-v2 \
+    --region "${AWS_REGION}" \
+    --bucket "${PUBLIC_SITE_BUCKET_NAME}" \
+    --query "KeyCount" \
+    --output text 2>/dev/null)"; then
+    return
+  fi
+  if [[ "${object_count}" != "0" ]]; then
+    echo "The retained deployment bucket is not empty; refusing to remove it." >&2
+    exit 1
+  fi
+
+  aws s3api delete-bucket \
+    --region "${AWS_REGION}" \
+    --bucket "${PUBLIC_SITE_BUCKET_NAME}" \
+    --expected-bucket-owner "${AWS_ACCOUNT_ID}"
+}
+
+cleanup_failed_stack
+
 hosted_zone_id=""
 ensure_hosted_zone() {
   if [[ -n "${hosted_zone_id}" ]]; then
