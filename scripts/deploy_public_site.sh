@@ -19,36 +19,40 @@ fi
 
 cleanup_failed_stack() {
   local stack_status
-  local object_count
+  local version_listing
+  local version_count
+  local delete_marker_count
   stack_status="$(aws cloudformation describe-stacks \
     --region "${AWS_REGION}" \
     --stack-name "${STACK_NAME}" \
     --query "Stacks[0].StackStatus" \
     --output text 2>/dev/null || true)"
-  if [[ "${stack_status}" != "ROLLBACK_COMPLETE" ]]; then
+  if [[ "${stack_status}" == "ROLLBACK_COMPLETE" ]]; then
+    echo "Removing the empty ROLLBACK_COMPLETE deployment stack."
+    aws cloudformation delete-stack \
+      --region "${AWS_REGION}" \
+      --stack-name "${STACK_NAME}"
+    aws cloudformation wait stack-delete-complete \
+      --region "${AWS_REGION}" \
+      --stack-name "${STACK_NAME}"
+  elif [[ -n "${stack_status}" && "${stack_status}" != "None" ]]; then
     return
   fi
 
-  echo "Removing the empty ROLLBACK_COMPLETE deployment stack."
-  aws cloudformation delete-stack \
-    --region "${AWS_REGION}" \
-    --stack-name "${STACK_NAME}"
-  aws cloudformation wait stack-delete-complete \
-    --region "${AWS_REGION}" \
-    --stack-name "${STACK_NAME}"
-
-  if ! object_count="$(aws s3api list-objects-v2 \
+  if ! version_listing="$(aws s3api list-object-versions \
     --region "${AWS_REGION}" \
     --bucket "${PUBLIC_SITE_BUCKET_NAME}" \
-    --query "KeyCount" \
-    --output text 2>/dev/null)"; then
+    --output json 2>/dev/null)"; then
     return
   fi
-  if [[ "${object_count}" != "0" ]]; then
+  version_count="$(jq '(.Versions // []) | length' <<<"${version_listing}")"
+  delete_marker_count="$(jq '(.DeleteMarkers // []) | length' <<<"${version_listing}")"
+  if [[ "${version_count}" != "0" || "${delete_marker_count}" != "0" ]]; then
     echo "The retained deployment bucket is not empty; refusing to remove it." >&2
     exit 1
   fi
 
+  echo "Removing the empty deployment bucket."
   aws s3api delete-bucket \
     --region "${AWS_REGION}" \
     --bucket "${PUBLIC_SITE_BUCKET_NAME}" \

@@ -119,6 +119,7 @@
                     "s3:GetBucketVersioning",
                     "s3:GetObject",
                     "s3:ListBucket",
+                    "s3:ListBucketVersions",
                     "s3:ListBucketMultipartUploads",
                     "s3:ListMultipartUploadParts",
                     "s3:PutEncryptionConfiguration",
