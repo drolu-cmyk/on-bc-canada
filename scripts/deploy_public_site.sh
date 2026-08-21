@@ -4,18 +4,29 @@ set -euo pipefail
 : "${AWS_ACCOUNT_ID:=891377012881}"
 : "${AWS_REGION:=ca-central-1}"
 : "${CERTIFICATE_REGION:=us-east-1}"
-: "${ROOT_DOMAIN_NAME:=sozorock.ca}"
-: "${DOMAIN_NAME:=www.sozorock.ca}"
+: "${CANONICAL_ROOT_DOMAIN:=sozorock.com}"
+: "${CANONICAL_DOMAIN:=canada.sozorock.com}"
+: "${LEGACY_ROOT_DOMAIN:=sozorock.ca}"
+: "${LEGACY_WWW_DOMAIN:=www.sozorock.ca}"
 : "${STACK_NAME:=sozorock-ca-public-site}"
 : "${PUBLIC_SITE_BUCKET_NAME:?PUBLIC_SITE_BUCKET_NAME is required}"
 
 CLOUDFRONT_ALIAS_ZONE_ID="Z2FDTNDATAQYW2"
+PUBLIC_DOMAINS=("${CANONICAL_DOMAIN}" "${LEGACY_ROOT_DOMAIN}" "${LEGACY_WWW_DOMAIN}")
 
 command -v aws >/dev/null
 command -v jq >/dev/null
 
-if [[ "${ROOT_DOMAIN_NAME}" != "sozorock.ca" || "${DOMAIN_NAME}" != "www.sozorock.ca" ]]; then
-  echo "This deployment is restricted to sozorock.ca and www.sozorock.ca." >&2
+if [[ "${CANONICAL_ROOT_DOMAIN}" != "sozorock.com" || "${CANONICAL_DOMAIN}" != "canada.sozorock.com" ]]; then
+  echo "This deployment is restricted to canada.sozorock.com under sozorock.com." >&2
+  exit 1
+fi
+if [[ "${LEGACY_ROOT_DOMAIN}" != "sozorock.ca" || "${LEGACY_WWW_DOMAIN}" != "www.sozorock.ca" ]]; then
+  echo "Legacy redirect hosts must remain sozorock.ca and www.sozorock.ca." >&2
+  exit 1
+fi
+if [[ "${AWS_REGION}" != "ca-central-1" || "${CERTIFICATE_REGION}" != "us-east-1" ]]; then
+  echo "Canada workloads must use ca-central-1 and CloudFront certificates must use us-east-1." >&2
   exit 1
 fi
 
@@ -38,12 +49,8 @@ cleanup_failed_stack() {
     --output text 2>/dev/null || true)"
   if [[ "${stack_status}" == "ROLLBACK_COMPLETE" ]]; then
     echo "Removing the empty ROLLBACK_COMPLETE deployment stack."
-    aws cloudformation delete-stack \
-      --region "${AWS_REGION}" \
-      --stack-name "${STACK_NAME}"
-    aws cloudformation wait stack-delete-complete \
-      --region "${AWS_REGION}" \
-      --stack-name "${STACK_NAME}"
+    aws cloudformation delete-stack --region "${AWS_REGION}" --stack-name "${STACK_NAME}"
+    aws cloudformation wait stack-delete-complete --region "${AWS_REGION}" --stack-name "${STACK_NAME}"
   elif [[ -n "${stack_status}" && "${stack_status}" != "None" ]]; then
     return
   fi
@@ -88,26 +95,32 @@ is_child_zone_delegated() {
 hosted_zone_for_record() {
   local record_name="$1"
   local record_fqdn="${record_name%.}"
-  local domain_fqdn="${DOMAIN_NAME%.}"
-  local root_fqdn="${ROOT_DOMAIN_NAME%.}"
+  local root_name=""
+  local child_name=""
   local root_zone_id
-  local domain_zone_id
+  local child_zone_id
 
-  if [[ "${record_fqdn}" != "${root_fqdn}" && "${record_fqdn}" != *".${root_fqdn}" ]]; then
-    echo "The record ${record_name} is outside the approved DNS zones." >&2
+  if [[ "${record_fqdn}" == "${CANONICAL_ROOT_DOMAIN}" || "${record_fqdn}" == *".${CANONICAL_ROOT_DOMAIN}" ]]; then
+    root_name="${CANONICAL_ROOT_DOMAIN}"
+    child_name="${CANONICAL_DOMAIN}"
+  elif [[ "${record_fqdn}" == "${LEGACY_ROOT_DOMAIN}" || "${record_fqdn}" == *".${LEGACY_ROOT_DOMAIN}" ]]; then
+    root_name="${LEGACY_ROOT_DOMAIN}"
+    child_name="${LEGACY_WWW_DOMAIN}"
+  else
+    echo "The record ${record_name} is outside the approved SozoRock DNS zones." >&2
     exit 1
   fi
 
-  root_zone_id="$(hosted_zone_id_for_name "${root_fqdn}.")"
+  root_zone_id="$(hosted_zone_id_for_name "${root_name}.")"
   if [[ -z "${root_zone_id}" ]]; then
-    echo "Public Route 53 hosted zone ${root_fqdn}. was not found in the approved AWS account." >&2
+    echo "Public Route 53 hosted zone ${root_name}. was not found in the approved AWS account." >&2
     exit 1
   fi
 
-  if [[ "${domain_fqdn}" != "${root_fqdn}" && ("${record_fqdn}" == "${domain_fqdn}" || "${record_fqdn}" == *".${domain_fqdn}") ]]; then
-    domain_zone_id="$(hosted_zone_id_for_name "${domain_fqdn}.")"
-    if [[ -n "${domain_zone_id}" ]] && is_child_zone_delegated "${root_zone_id##*/}" "${domain_fqdn}"; then
-      printf '%s\n' "${domain_zone_id##*/}"
+  if [[ "${child_name}" != "${root_name}" && ("${record_fqdn}" == "${child_name}" || "${record_fqdn}" == *".${child_name}") ]]; then
+    child_zone_id="$(hosted_zone_id_for_name "${child_name}.")"
+    if [[ -n "${child_zone_id}" ]] && is_child_zone_delegated "${root_zone_id##*/}" "${child_name}"; then
+      printf '%s\n' "${child_zone_id##*/}"
       return
     fi
   fi
@@ -196,10 +209,15 @@ certificate_covers_domains() {
   aws acm describe-certificate \
     --region "${CERTIFICATE_REGION}" \
     --certificate-arn "${certificate_arn}" \
-    --output json | jq -e --arg root "${ROOT_DOMAIN_NAME}" --arg www "${DOMAIN_NAME}" '
+    --output json | jq -e \
+      --arg canonical "${CANONICAL_DOMAIN}" \
+      --arg legacy_root "${LEGACY_ROOT_DOMAIN}" \
+      --arg legacy_www "${LEGACY_WWW_DOMAIN}" '
       (.Certificate.Status == "ISSUED" or .Certificate.Status == "PENDING_VALIDATION")
       and ([.Certificate.SubjectAlternativeNames[]? | ascii_downcase | rtrimstr(".")] as $names
-        | ($names | index($root)) != null and ($names | index($www)) != null)
+        | ($names | index($canonical)) != null
+        and ($names | index($legacy_root)) != null
+        and ($names | index($legacy_www)) != null)
     ' >/dev/null
 }
 
@@ -225,8 +243,8 @@ ensure_certificate() {
   if [[ -z "${certificate_arn}" ]]; then
     certificate_arn="$(aws acm request-certificate \
       --region "${CERTIFICATE_REGION}" \
-      --domain-name "${ROOT_DOMAIN_NAME}" \
-      --subject-alternative-names "${DOMAIN_NAME}" \
+      --domain-name "${CANONICAL_DOMAIN}" \
+      --subject-alternative-names "${LEGACY_ROOT_DOMAIN}" "${LEGACY_WWW_DOMAIN}" \
       --validation-method DNS \
       --query CertificateArn \
       --output text)"
@@ -271,8 +289,9 @@ deploy_stack() {
     --no-fail-on-empty-changeset \
     --parameter-overrides \
       "PublicSiteBucketName=${PUBLIC_SITE_BUCKET_NAME}" \
-      "RootDomainName=${ROOT_DOMAIN_NAME}" \
-      "DomainName=${DOMAIN_NAME}" \
+      "CanonicalDomainName=${CANONICAL_DOMAIN}" \
+      "LegacyRootDomainName=${LEGACY_ROOT_DOMAIN}" \
+      "LegacyWwwDomainName=${LEGACY_WWW_DOMAIN}" \
       "CertificateArn=${CERTIFICATE_ARN}" \
       "PublishAlias=${publish_alias}" \
       "PriceClass=PriceClass_100"
@@ -307,11 +326,11 @@ transfer_domain_associations() {
   local target_etag
   local transfer_output
 
-  for domain_name in "${ROOT_DOMAIN_NAME}" "${DOMAIN_NAME}"; do
+  for domain_name in "${PUBLIC_DOMAINS[@]}"; do
     upsert_txt "_${domain_name}." "\"${target_distribution_domain%.}\""
   done
 
-  for domain_name in "${ROOT_DOMAIN_NAME}" "${DOMAIN_NAME}"; do
+  for domain_name in "${PUBLIC_DOMAINS[@]}"; do
     if distribution_has_alias "${target_distribution_id}" "${domain_name}"; then
       echo "CloudFront already serves ${domain_name}."
       continue
@@ -337,7 +356,7 @@ transfer_domain_associations() {
       --if-match "${target_etag}" 2>&1)"; then
       echo "CloudFront could not transfer ${domain_name} to the target distribution." >&2
       echo "${transfer_output}" >&2
-      echo "The source distribution must be disabled, or AWS Support must complete the transfer." >&2
+      echo "The source distribution must be disabled, or AWS Support must complete the ownership transfer." >&2
       exit 1
     fi
     echo "CloudFront transfer accepted for ${domain_name}."
@@ -471,23 +490,22 @@ invalidation_id="$(aws cloudfront create-invalidation \
   --paths "/*" \
   --query "Invalidation.Id" \
   --output text)"
-aws cloudfront wait invalidation-completed \
-  --distribution-id "${distribution_id}" \
-  --id "${invalidation_id}"
+aws cloudfront wait invalidation-completed --distribution-id "${distribution_id}" --id "${invalidation_id}"
 
 transfer_domain_associations "${distribution_id}" "${distribution_domain}"
 aws cloudfront wait distribution-deployed --id "${distribution_id}"
 deploy_stack true
 aws cloudfront wait distribution-deployed --id "${distribution_id}"
 
-for domain_name in "${ROOT_DOMAIN_NAME}" "${DOMAIN_NAME}"; do
+for domain_name in "${PUBLIC_DOMAINS[@]}"; do
   if ! distribution_has_alias "${distribution_id}" "${domain_name}"; then
     echo "CloudFront did not attach ${domain_name} to ${distribution_id}." >&2
     exit 1
   fi
 done
 
-replace_with_cloudfront_alias "${ROOT_DOMAIN_NAME}." "${distribution_domain}"
-replace_with_cloudfront_alias "${DOMAIN_NAME}." "${distribution_domain}"
+for domain_name in "${PUBLIC_DOMAINS[@]}"; do
+  replace_with_cloudfront_alias "${domain_name}." "${distribution_domain}"
+done
 
-printf 'Published https://%s and https://%s\n' "${ROOT_DOMAIN_NAME}" "${DOMAIN_NAME}"
+printf 'Published https://%s; legacy .ca hosts redirect permanently to the canonical Canada site.\n' "${CANONICAL_DOMAIN}"
