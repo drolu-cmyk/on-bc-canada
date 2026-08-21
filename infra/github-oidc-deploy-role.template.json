@@ -32,39 +32,27 @@
       "Type": "AWS::IAM::OIDCProvider",
       "Properties": {
         "Url": "https://token.actions.githubusercontent.com",
-        "ClientIdList": [
-          "sts.amazonaws.com"
-        ]
+        "ClientIdList": ["sts.amazonaws.com"]
       }
     },
     "GitHubActionsDeployRole": {
       "Type": "AWS::IAM::Role",
       "Properties": {
         "RoleName": "SozoRockCanadaPublicSiteDeploy",
-        "Description": "Short-lived GitHub OIDC role for automated SozoRock.ca publication.",
+        "Description": "Short-lived GitHub OIDC role for automated SozoRock Canada publication.",
         "AssumeRolePolicyDocument": {
           "Version": "2012-10-17",
           "Statement": [
             {
               "Effect": "Allow",
-              "Principal": {
-                "Federated": {
-                  "Ref": "GitHubActionsOidcProvider"
-                }
-              },
+              "Principal": {"Federated": {"Ref": "GitHubActionsOidcProvider"}},
               "Action": "sts:AssumeRoleWithWebIdentity",
               "Condition": {
-                "StringEquals": {
-                  "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
-                },
+                "StringEquals": {"token.actions.githubusercontent.com:aud": "sts.amazonaws.com"},
                 "StringLike": {
                   "token.actions.githubusercontent.com:sub": [
-                    {
-                      "Fn::Sub": "repo:${GitHubOwner}/${GitHubRepository}:ref:refs/heads/${GitHubBranch}"
-                    },
-                    {
-                      "Fn::Sub": "repo:${GitHubOwner}@*/${GitHubRepository}@*:ref:refs/heads/${GitHubBranch}"
-                    }
+                    {"Fn::Sub": "repo:${GitHubOwner}/${GitHubRepository}:ref:refs/heads/${GitHubBranch}"},
+                    {"Fn::Sub": "repo:${GitHubOwner}@*/${GitHubRepository}@*:ref:refs/heads/${GitHubBranch}"}
                   ]
                 }
               }
@@ -131,12 +119,8 @@
                     "s3:PutObject"
                   ],
                   "Resource": [
-                    {
-                      "Fn::Sub": "arn:${AWS::Partition}:s3:::${PublicSiteBucketName}"
-                    },
-                    {
-                      "Fn::Sub": "arn:${AWS::Partition}:s3:::${PublicSiteBucketName}/*"
-                    }
+                    {"Fn::Sub": "arn:${AWS::Partition}:s3:::${PublicSiteBucketName}"},
+                    {"Fn::Sub": "arn:${AWS::Partition}:s3:::${PublicSiteBucketName}/*"}
                   ]
                 },
                 {
@@ -144,20 +128,27 @@
                   "Effect": "Allow",
                   "Action": [
                     "cloudfront:CreateDistribution",
+                    "cloudfront:CreateFunction",
                     "cloudfront:CreateInvalidation",
                     "cloudfront:CreateOriginAccessControl",
                     "cloudfront:DeleteDistribution",
+                    "cloudfront:DeleteFunction",
                     "cloudfront:DeleteOriginAccessControl",
+                    "cloudfront:DescribeFunction",
                     "cloudfront:GetDistribution",
                     "cloudfront:GetDistributionConfig",
+                    "cloudfront:GetFunction",
                     "cloudfront:GetInvalidation",
                     "cloudfront:GetOriginAccessControl",
                     "cloudfront:ListDistributions",
                     "cloudfront:ListDomainConflicts",
+                    "cloudfront:ListFunctions",
                     "cloudfront:ListOriginAccessControls",
+                    "cloudfront:PublishFunction",
                     "cloudfront:TagResource",
                     "cloudfront:UpdateDomainAssociation",
                     "cloudfront:UpdateDistribution",
+                    "cloudfront:UpdateFunction",
                     "cloudfront:UpdateOriginAccessControl"
                   ],
                   "Resource": "*"
@@ -165,11 +156,7 @@
                 {
                   "Sid": "CertificateLifecycle",
                   "Effect": "Allow",
-                  "Action": [
-                    "acm:DescribeCertificate",
-                    "acm:ListCertificates",
-                    "acm:RequestCertificate"
-                  ],
+                  "Action": ["acm:DescribeCertificate", "acm:ListCertificates", "acm:RequestCertificate"],
                   "Resource": "*"
                 },
                 {
@@ -188,11 +175,7 @@
                   "Effect": "Allow",
                   "Action": "iam:CreateServiceLinkedRole",
                   "Resource": "*",
-                  "Condition": {
-                    "StringEquals": {
-                      "iam:AWSServiceName": "cloudfront.amazonaws.com"
-                    }
-                  }
+                  "Condition": {"StringEquals": {"iam:AWSServiceName": "cloudfront.amazonaws.com"}}
                 },
                 {
                   "Sid": "IdentityCheck",
@@ -210,12 +193,7 @@
   "Outputs": {
     "GitHubActionsDeployRoleArn": {
       "Description": "Role ARN used by the GitHub OIDC deployment workflow.",
-      "Value": {
-        "Fn::GetAtt": [
-          "GitHubActionsDeployRole",
-          "Arn"
-        ]
-      }
+      "Value": {"Fn::GetAtt": ["GitHubActionsDeployRole", "Arn"]}
     }
   }
 }
