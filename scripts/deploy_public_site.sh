@@ -6,6 +6,7 @@ set -euo pipefail
 : "${CERTIFICATE_REGION:=us-east-1}"
 : "${CANONICAL_ROOT_DOMAIN:=sozorock.com}"
 : "${CANONICAL_DOMAIN:=canada.sozorock.com}"
+: "${CANONICAL_DNS_ZONE:=canada.sozorock.com}"
 : "${LEGACY_ROOT_DOMAIN:=sozorock.ca}"
 : "${LEGACY_WWW_DOMAIN:=www.sozorock.ca}"
 : "${STACK_NAME:=sozorock-ca-public-site}"
@@ -17,8 +18,8 @@ PUBLIC_DOMAINS=("${CANONICAL_DOMAIN}" "${LEGACY_ROOT_DOMAIN}" "${LEGACY_WWW_DOMA
 command -v aws >/dev/null
 command -v jq >/dev/null
 
-if [[ "${CANONICAL_ROOT_DOMAIN}" != "sozorock.com" || "${CANONICAL_DOMAIN}" != "canada.sozorock.com" ]]; then
-  echo "This deployment is restricted to canada.sozorock.com under sozorock.com." >&2
+if [[ "${CANONICAL_ROOT_DOMAIN}" != "sozorock.com" || "${CANONICAL_DOMAIN}" != "canada.sozorock.com" || "${CANONICAL_DNS_ZONE}" != "canada.sozorock.com" ]]; then
+  echo "This deployment is restricted to the delegated canada.sozorock.com DNS zone under sozorock.com." >&2
   exit 1
 fi
 if [[ "${LEGACY_ROOT_DOMAIN}" != "sozorock.ca" || "${LEGACY_WWW_DOMAIN}" != "www.sozorock.ca" ]]; then
@@ -83,49 +84,40 @@ hosted_zone_id_for_name() {
       '[.HostedZones[] | select(.Name == $zone and .Config.PrivateZone == false) | .Id] | first // empty'
 }
 
-is_child_zone_delegated() {
-  local parent_zone_id="$1"
-  local child_zone_name="$2"
-  aws route53 list-resource-record-sets \
-    --hosted-zone-id "${parent_zone_id}" \
-    --output json | jq -e --arg name "${child_zone_name}." \
-      '[.ResourceRecordSets[] | select(.Name == $name and .Type == "NS")] | length > 0' >/dev/null
-}
-
 hosted_zone_for_record() {
   local record_name="$1"
   local record_fqdn="${record_name%.}"
-  local root_name=""
-  local child_name=""
-  local root_zone_id
-  local child_zone_id
+  local zone_name=""
+  local zone_id
 
-  if [[ "${record_fqdn}" == "${CANONICAL_ROOT_DOMAIN}" || "${record_fqdn}" == *".${CANONICAL_ROOT_DOMAIN}" ]]; then
-    root_name="${CANONICAL_ROOT_DOMAIN}"
-    child_name="${CANONICAL_DOMAIN}"
+  if [[ "${record_fqdn}" == "${CANONICAL_DNS_ZONE}" || "${record_fqdn}" == *".${CANONICAL_DNS_ZONE}" ]]; then
+    zone_name="${CANONICAL_DNS_ZONE}"
   elif [[ "${record_fqdn}" == "${LEGACY_ROOT_DOMAIN}" || "${record_fqdn}" == *".${LEGACY_ROOT_DOMAIN}" ]]; then
-    root_name="${LEGACY_ROOT_DOMAIN}"
-    child_name="${LEGACY_WWW_DOMAIN}"
+    zone_name="${LEGACY_ROOT_DOMAIN}"
   else
-    echo "The record ${record_name} is outside the approved SozoRock DNS zones." >&2
+    echo "The record ${record_name} is outside the approved Canada and legacy DNS zones." >&2
     exit 1
   fi
 
-  root_zone_id="$(hosted_zone_id_for_name "${root_name}.")"
-  if [[ -z "${root_zone_id}" ]]; then
-    echo "Public Route 53 hosted zone ${root_name}. was not found in the approved AWS account." >&2
+  zone_id="$(hosted_zone_id_for_name "${zone_name}.")"
+  if [[ -z "${zone_id}" ]]; then
+    echo "Public Route 53 hosted zone ${zone_name}. was not found in AWS account ${AWS_ACCOUNT_ID}." >&2
     exit 1
   fi
 
-  if [[ "${child_name}" != "${root_name}" && ("${record_fqdn}" == "${child_name}" || "${record_fqdn}" == *".${child_name}") ]]; then
-    child_zone_id="$(hosted_zone_id_for_name "${child_name}.")"
-    if [[ -n "${child_zone_id}" ]] && is_child_zone_delegated "${root_zone_id##*/}" "${child_name}"; then
-      printf '%s\n' "${child_zone_id##*/}"
-      return
+  printf '%s\n' "${zone_id##*/}"
+}
+
+assert_required_hosted_zones() {
+  local zone_name
+  local zone_id
+  for zone_name in "${CANONICAL_DNS_ZONE}" "${LEGACY_ROOT_DOMAIN}"; do
+    zone_id="$(hosted_zone_id_for_name "${zone_name}.")"
+    if [[ -z "${zone_id}" ]]; then
+      echo "Required public Route 53 hosted zone ${zone_name}. is missing from AWS account ${AWS_ACCOUNT_ID}." >&2
+      exit 1
     fi
-  fi
-
-  printf '%s\n' "${root_zone_id##*/}"
+  done
 }
 
 upsert_cname() {
@@ -434,6 +426,7 @@ replace_with_cloudfront_alias() {
   fi
 }
 
+assert_required_hosted_zones
 cleanup_failed_stack
 CERTIFICATE_ARN="$(ensure_certificate)"
 
