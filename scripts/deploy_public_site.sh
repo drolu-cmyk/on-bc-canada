@@ -309,6 +309,9 @@ transfer_domain_associations() {
 
   for domain_name in "${ROOT_DOMAIN_NAME}" "${DOMAIN_NAME}"; do
     upsert_txt "_${domain_name}." "\"${target_distribution_domain%.}\""
+  done
+
+  for domain_name in "${ROOT_DOMAIN_NAME}" "${DOMAIN_NAME}"; do
     if distribution_has_alias "${target_distribution_id}" "${domain_name}"; then
       echo "CloudFront already serves ${domain_name}."
       continue
