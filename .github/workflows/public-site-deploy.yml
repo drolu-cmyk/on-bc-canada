@@ -61,7 +61,7 @@ jobs:
         run: bash -n scripts/deploy_public_site.sh
 
   deploy:
-    if: github.ref == 'refs/heads/main' && vars.PUBLIC_SITE_DEPLOYMENT_ENABLED == 'true'
+    if: github.ref == 'refs/heads/main' && vars.PUBLIC_SITE_DEPLOYMENT_ENABLED == 'true' && vars.CANADA_DOMAIN_MIGRATION_ENABLED == 'true'
     needs: validate
     runs-on: ubuntu-latest
     permissions:
