@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://www.sozorock.ca/sitemap.xml
+Sitemap: https://canada.sozorock.com/sitemap.xml
