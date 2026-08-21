@@ -11,8 +11,8 @@ Public site: https://www.sozorock.ca
 - Price: CAD $0.
 - Launch record: certificate of attendance and participation record.
 - Curriculum: fundamentals-first, problem-led, evidence-based, tool-neutral, and designed for transfer across changing technologies.
-- Data reference region: AWS Canada Central for applicable program data, with provider, data-flow, retention, and deletion controls recorded in the release evidence.
-- Collaboration: Google Drive provides sharing and collaboration; versioned source and evidence remain canonical.
+- Public site privacy: The public site collects no learner data.
+- Collaboration: Google Drive provides program resource sharing and collaboration.
 
 ## Learning design
 
