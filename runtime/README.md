@@ -45,13 +45,25 @@ The default local database is `local-data/research.sqlite3`. `local-data/` is ig
 
 `research_runner.py` supplies testable start and resume helpers. `run_research.py` is the command interface.
 
-Install the agent runtime dependencies before live use:
+## Work Intelligence
+
+`work_intelligence.py` converts validated research into traceable relationships between pathways, roles, capabilities, technologies, and sources. Research recommendations that would change a pathway must carry the human curriculum authorization record before those relationships can enter Work Intelligence.
+
+## Capability graph
+
+`capability_graph.py` defines the learner capability layer beneath modules and delivery content. Work Intelligence must first support the capability. A candidate capability then carries an observable description, target proficiency, evidence standards, prerequisites, and exact Work Intelligence provenance.
+
+A capability becomes active only after a named human decision. Deterministic checks require evidence standards, provenance, and active prerequisites. Active capability definitions cannot be replaced by an agent-authored candidate, and retirement is blocked while another active capability depends on the capability.
+
+`run_capability_graph.py` provides command operations for evidence-backed candidate creation, activation, retirement, inspection, and pathway listing. Local reference data defaults under `local-data/` and does not belong in source control.
+
+Install the agent runtime dependencies before live research use:
 
 ```bash
 python -m pip install -r runtime/requirements-agentic.txt
 ```
 
-A live run additionally requires `OPENAI_API_KEY`. Secrets do not belong in the repository.
+A live research run additionally requires `OPENAI_API_KEY`. Secrets do not belong in the repository.
 
 Start research inside one launch domain:
 
@@ -85,4 +97,4 @@ Run the tests from the repository root:
 python -m unittest discover -s runtime -p 'test_*.py' -v
 ```
 
-The test suite does not make live model calls. It checks graph execution, persistence, stop-and-resume behavior, domain specialization, provider contracts, command boundaries, and installed SDK construction.
+The test suite does not make live model calls. It checks graph execution, persistence, stop-and-resume behavior, domain specialization, provider contracts, Work Intelligence, Capability Graph authority, command boundaries, and installed SDK construction.
