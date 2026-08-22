@@ -144,33 +144,48 @@ class RuntimeAssuranceSnapshotBuilder:
         try:
             with sqlite3.connect(path) as connection:
                 connection.row_factory = sqlite3.Row
-                totals = connection.execute(
+                trace_totals = connection.execute(
                     """
                     SELECT
-                        COUNT(DISTINCT t.trace_id) AS trace_count,
-                        COUNT(s.span_id) AS span_count,
-                        SUM(CASE WHEN s.span_type = 'generation' THEN 1 ELSE 0 END) AS generation_count,
-                        SUM(CASE WHEN s.span_type IN ('function', 'mcp_tools') THEN 1 ELSE 0 END) AS tool_span_count,
-                        SUM(CASE WHEN s.span_type = 'generation' AND s.pricing_status = 'estimated' THEN 1 ELSE 0 END) AS priced_generation_count,
-                        SUM(s.requests) AS request_count,
-                        SUM(s.input_tokens) AS input_tokens,
-                        SUM(s.output_tokens) AS output_tokens,
-                        SUM(s.total_tokens) AS total_tokens,
-                        SUM(s.cached_input_tokens) AS cached_input_tokens,
-                        SUM(s.reasoning_tokens) AS reasoning_tokens,
-                        SUM(s.estimated_cost_usd) AS estimated_cost_usd,
-                        AVG(t.latency_ms) AS average_run_latency_ms,
-                        AVG(CASE WHEN s.span_type = 'generation' THEN s.latency_ms END) AS average_generation_latency_ms,
-                        AVG(CASE WHEN s.span_type IN ('function', 'mcp_tools') THEN s.latency_ms END) AS average_tool_latency_ms
-                    FROM model_traces t
-                    LEFT JOIN model_spans s ON s.trace_id = t.trace_id
+                        COUNT(*) AS trace_count,
+                        AVG(latency_ms) AS average_run_latency_ms
+                    FROM model_traces
                     """
                 ).fetchone()
-                workflows = connection.execute(
+                span_totals = connection.execute(
+                    """
+                    SELECT
+                        COUNT(*) AS span_count,
+                        SUM(CASE WHEN span_type = 'generation' THEN 1 ELSE 0 END) AS generation_count,
+                        SUM(CASE WHEN span_type IN ('function', 'mcp_tools') THEN 1 ELSE 0 END) AS tool_span_count,
+                        SUM(CASE WHEN span_type = 'generation' AND pricing_status = 'estimated' THEN 1 ELSE 0 END) AS priced_generation_count,
+                        SUM(requests) AS request_count,
+                        SUM(input_tokens) AS input_tokens,
+                        SUM(output_tokens) AS output_tokens,
+                        SUM(total_tokens) AS total_tokens,
+                        SUM(cached_input_tokens) AS cached_input_tokens,
+                        SUM(reasoning_tokens) AS reasoning_tokens,
+                        SUM(estimated_cost_usd) AS estimated_cost_usd,
+                        AVG(CASE WHEN span_type = 'generation' THEN latency_ms END) AS average_generation_latency_ms,
+                        AVG(CASE WHEN span_type IN ('function', 'mcp_tools') THEN latency_ms END) AS average_tool_latency_ms
+                    FROM model_spans
+                    """
+                ).fetchone()
+                trace_workflows = connection.execute(
+                    """
+                    SELECT
+                        work_type,
+                        COUNT(*) AS model_run_count,
+                        AVG(latency_ms) AS average_run_latency_ms
+                    FROM model_traces
+                    GROUP BY work_type
+                    ORDER BY work_type
+                    """
+                ).fetchall()
+                span_workflows = connection.execute(
                     """
                     SELECT
                         t.work_type,
-                        COUNT(DISTINCT t.trace_id) AS model_run_count,
                         SUM(CASE WHEN s.span_type = 'generation' THEN 1 ELSE 0 END) AS generation_count,
                         SUM(s.requests) AS request_count,
                         SUM(s.input_tokens) AS input_tokens,
@@ -179,7 +194,6 @@ class RuntimeAssuranceSnapshotBuilder:
                         SUM(s.cached_input_tokens) AS cached_input_tokens,
                         SUM(s.reasoning_tokens) AS reasoning_tokens,
                         SUM(s.estimated_cost_usd) AS estimated_cost_usd,
-                        AVG(t.latency_ms) AS average_run_latency_ms,
                         AVG(CASE WHEN s.span_type = 'generation' THEN s.latency_ms END) AS average_generation_latency_ms
                     FROM model_traces t
                     LEFT JOIN model_spans s ON s.trace_id = t.trace_id
@@ -190,55 +204,56 @@ class RuntimeAssuranceSnapshotBuilder:
         except sqlite3.OperationalError:
             return {"path_present": True, "reason": "telemetry_schema_unavailable", "workflows": []}
 
-        def integer(name: str) -> int:
-            return int(totals[name] or 0)
+        def integer(row: sqlite3.Row, name: str) -> int:
+            return int(row[name] or 0)
 
-        def decimal(name: str, digits: int = 3) -> float | None:
-            value = totals[name]
+        def decimal(row: sqlite3.Row, name: str, digits: int = 3) -> float | None:
+            value = row[name]
             return round(float(value), digits) if value is not None else None
 
+        span_by_work = {row["work_type"]: row for row in span_workflows}
         workflow_rows: list[dict[str, Any]] = []
-        for row in workflows:
+        for trace_row in trace_workflows:
+            work_type = trace_row["work_type"]
+            span_row = span_by_work.get(work_type)
             workflow_rows.append(
                 {
-                    "work_type": row["work_type"],
-                    "model_run_count": int(row["model_run_count"] or 0),
-                    "generation_count": int(row["generation_count"] or 0),
-                    "request_count": int(row["request_count"] or 0),
-                    "input_tokens": int(row["input_tokens"] or 0),
-                    "output_tokens": int(row["output_tokens"] or 0),
-                    "total_tokens": int(row["total_tokens"] or 0),
-                    "cached_input_tokens": int(row["cached_input_tokens"] or 0),
-                    "reasoning_tokens": int(row["reasoning_tokens"] or 0),
-                    "estimated_cost_usd": round(float(row["estimated_cost_usd"]), 8)
-                    if row["estimated_cost_usd"] is not None
+                    "work_type": work_type,
+                    "model_run_count": int(trace_row["model_run_count"] or 0),
+                    "generation_count": integer(span_row, "generation_count") if span_row is not None else 0,
+                    "request_count": integer(span_row, "request_count") if span_row is not None else 0,
+                    "input_tokens": integer(span_row, "input_tokens") if span_row is not None else 0,
+                    "output_tokens": integer(span_row, "output_tokens") if span_row is not None else 0,
+                    "total_tokens": integer(span_row, "total_tokens") if span_row is not None else 0,
+                    "cached_input_tokens": integer(span_row, "cached_input_tokens") if span_row is not None else 0,
+                    "reasoning_tokens": integer(span_row, "reasoning_tokens") if span_row is not None else 0,
+                    "estimated_cost_usd": decimal(span_row, "estimated_cost_usd", 8) if span_row is not None else None,
+                    "average_run_latency_ms": round(float(trace_row["average_run_latency_ms"]), 3)
+                    if trace_row["average_run_latency_ms"] is not None
                     else None,
-                    "average_run_latency_ms": round(float(row["average_run_latency_ms"]), 3)
-                    if row["average_run_latency_ms"] is not None
-                    else None,
-                    "average_generation_latency_ms": round(float(row["average_generation_latency_ms"]), 3)
-                    if row["average_generation_latency_ms"] is not None
+                    "average_generation_latency_ms": decimal(span_row, "average_generation_latency_ms")
+                    if span_row is not None
                     else None,
                 }
             )
 
         return {
             "path_present": True,
-            "trace_count": integer("trace_count"),
-            "span_count": integer("span_count"),
-            "generation_count": integer("generation_count"),
-            "tool_span_count": integer("tool_span_count"),
-            "priced_generation_count": integer("priced_generation_count"),
-            "request_count": integer("request_count"),
-            "input_tokens": integer("input_tokens"),
-            "output_tokens": integer("output_tokens"),
-            "total_tokens": integer("total_tokens"),
-            "cached_input_tokens": integer("cached_input_tokens"),
-            "reasoning_tokens": integer("reasoning_tokens"),
-            "estimated_cost_usd": decimal("estimated_cost_usd", 8),
-            "average_run_latency_ms": decimal("average_run_latency_ms"),
-            "average_generation_latency_ms": decimal("average_generation_latency_ms"),
-            "average_tool_latency_ms": decimal("average_tool_latency_ms"),
+            "trace_count": integer(trace_totals, "trace_count"),
+            "span_count": integer(span_totals, "span_count"),
+            "generation_count": integer(span_totals, "generation_count"),
+            "tool_span_count": integer(span_totals, "tool_span_count"),
+            "priced_generation_count": integer(span_totals, "priced_generation_count"),
+            "request_count": integer(span_totals, "request_count"),
+            "input_tokens": integer(span_totals, "input_tokens"),
+            "output_tokens": integer(span_totals, "output_tokens"),
+            "total_tokens": integer(span_totals, "total_tokens"),
+            "cached_input_tokens": integer(span_totals, "cached_input_tokens"),
+            "reasoning_tokens": integer(span_totals, "reasoning_tokens"),
+            "estimated_cost_usd": decimal(span_totals, "estimated_cost_usd", 8),
+            "average_run_latency_ms": decimal(trace_totals, "average_run_latency_ms"),
+            "average_generation_latency_ms": decimal(span_totals, "average_generation_latency_ms"),
+            "average_tool_latency_ms": decimal(span_totals, "average_tool_latency_ms"),
             "workflows": workflow_rows,
             "trace_linkage": "local trace_id retained; prompts and outputs excluded",
             "pricing": "cost is estimated only when SOZOROCK_MODEL_PRICING_JSON supplies reviewed rates",
