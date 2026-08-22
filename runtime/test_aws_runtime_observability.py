@@ -57,6 +57,18 @@ def query_result(**values):
     return [{"field": key, "value": str(value)} for key, value in values.items()]
 
 
+def nested_keys(value) -> set[str]:
+    keys: set[str] = set()
+    if isinstance(value, dict):
+        for key, item in value.items():
+            keys.add(str(key).casefold())
+            keys.update(nested_keys(item))
+    elif isinstance(value, list):
+        for item in value:
+            keys.update(nested_keys(item))
+    return keys
+
+
 class RaisingPublisher:
     def publish_trace(self, trace_id: str):
         raise RuntimeError("simulated CloudWatch outage")
@@ -239,9 +251,21 @@ class AwsRuntimeObservabilityTests(unittest.TestCase):
         self.assertTrue(snapshot["telemetry_coverage"]["provider_latency"])
         self.assertFalse(snapshot["telemetry_coverage"]["hosted_tool_latency"])
         self.assertEqual("aws_cloudwatch_logs_insights", snapshot["model_runtime"]["source"])
-        encoded = json.dumps(snapshot, sort_keys=True).casefold()
-        self.assertNotIn("prompt", encoded)
-        self.assertNotIn("tool_argument", encoded)
+        keys = nested_keys(snapshot)
+        forbidden = {
+            "prompt",
+            "prompt_body",
+            "model_output",
+            "tool_argument",
+            "tool_output",
+            "learner_id",
+            "submission_id",
+            "credential",
+            "secret",
+        }
+        self.assertTrue(forbidden.isdisjoint(keys), sorted(forbidden & keys))
+        self.assertFalse(snapshot["model_boundary"]["contains_prompts_or_model_outputs"])
+        self.assertFalse(snapshot["model_boundary"]["contains_tool_arguments_or_outputs"])
 
     def test_cloudwatch_failure_never_propagates_from_trace_processor(self):
         with tempfile.TemporaryDirectory() as directory:
