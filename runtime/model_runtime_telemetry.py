@@ -23,6 +23,8 @@ from typing import Any, Iterator
 TELEMETRY_DB_ENV = "SOZOROCK_MODEL_TELEMETRY_DB"
 MODEL_PRICING_ENV = "SOZOROCK_MODEL_PRICING_JSON"
 TRACE_SENSITIVE_DATA_ENV = "OPENAI_AGENTS_TRACE_INCLUDE_SENSITIVE_DATA"
+DONT_LOG_MODEL_DATA_ENV = "OPENAI_AGENTS_DONT_LOG_MODEL_DATA"
+DONT_LOG_TOOL_DATA_ENV = "OPENAI_AGENTS_DONT_LOG_TOOL_DATA"
 DEFAULT_TELEMETRY_DB = Path("local-data/model-telemetry.sqlite3")
 
 
@@ -138,6 +140,7 @@ def _pricing(model: str | None, *, input_tokens: int, cached_tokens: int, output
     except (KeyError, TypeError, ValueError, json.JSONDecodeError):
         return {"pricing_status": "invalid_config", "estimated_cost_usd": None}
 
+    cached_tokens = min(max(cached_tokens, 0), max(input_tokens, 0))
     uncached_tokens = max(input_tokens - cached_tokens, 0)
     estimated = (
         (uncached_tokens * input_rate)
@@ -274,20 +277,28 @@ class ModelTelemetryStore:
         elif span_type == "mcp_tools":
             span_name = "mcp_tools"
 
-        usage = getattr(data, "usage", None)
+        # Task, turn, and response spans may repeat aggregate usage. Generation spans
+        # are the accounting source to avoid double-counting the same model tokens.
+        usage = getattr(data, "usage", None) if span_type == "generation" else None
         if not isinstance(usage, dict):
             usage = None
         requests = _usage_value(usage, "requests")
+        if span_type == "generation" and usage is not None and requests < 1:
+            requests = 1
         input_tokens = _usage_value(usage, "input_tokens")
         output_tokens = _usage_value(usage, "output_tokens")
         total_tokens = _usage_value(usage, "total_tokens")
-        cached_tokens = _nested_usage_value(usage, "input_tokens_details", "cached_tokens")
+        if span_type == "generation" and total_tokens < 1 and (input_tokens or output_tokens):
+            total_tokens = input_tokens + output_tokens
+        cached_tokens = min(
+            _nested_usage_value(usage, "input_tokens_details", "cached_tokens"),
+            input_tokens,
+        )
         reasoning_tokens = _nested_usage_value(usage, "output_tokens_details", "reasoning_tokens")
-        pricing = _pricing(
-            model,
-            input_tokens=input_tokens,
-            cached_tokens=cached_tokens,
-            output_tokens=output_tokens,
+        pricing = (
+            _pricing(model, input_tokens=input_tokens, cached_tokens=cached_tokens, output_tokens=output_tokens)
+            if span_type == "generation"
+            else {"pricing_status": "not_applicable", "estimated_cost_usd": None}
         )
         started_at = getattr(span, "started_at", None)
         ended_at = getattr(span, "ended_at", None)
@@ -411,13 +422,16 @@ def install_model_runtime_telemetry() -> None:
     """Install one privacy-safe secondary tracing processor per process."""
 
     global _INSTALLED, _PROCESSOR
+    # Enforce content-exclusion defaults before each governed live run. RunConfig
+    # reads the sensitive-trace default when a run configuration is created.
+    os.environ[TRACE_SENSITIVE_DATA_ENV] = "0"
+    os.environ[DONT_LOG_MODEL_DATA_ENV] = "1"
+    os.environ[DONT_LOG_TOOL_DATA_ENV] = "1"
     if _INSTALLED:
         return
     with _INSTALL_LOCK:
         if _INSTALLED:
             return
-        # This platform never permits prompt, output, or tool payload bodies in SDK traces.
-        os.environ[TRACE_SENSITIVE_DATA_ENV] = "0"
         try:
             from agents import add_trace_processor
 
