@@ -32,10 +32,12 @@ class AgentRuntimeBudgetTests(unittest.TestCase):
                 registered = WORKFLOW_RUNTIME_BUDGETS[work_type].max_model_calls_per_execution
                 self.assertEqual(observed, registered)
 
-    def test_platform_orchestrator_is_one_model_call_with_no_automatic_retry(self):
-        budget = WORKFLOW_RUNTIME_BUDGETS["platform_orchestration"]
-        self.assertEqual(1, budget.max_model_calls_per_execution)
-        self.assertEqual(0, budget.retry_limit_per_agent)
+    def test_non_graph_workers_are_one_model_call_with_no_automatic_retry(self):
+        for work_type in ("learning_design", "platform_orchestration"):
+            with self.subTest(work_type=work_type):
+                budget = WORKFLOW_RUNTIME_BUDGETS[work_type]
+                self.assertEqual(1, budget.max_model_calls_per_execution)
+                self.assertEqual(0, budget.retry_limit_per_agent)
 
     def test_all_launch_workflows_disable_automatic_model_retries(self):
         self.assertTrue(all(item.retry_limit_per_agent == 0 for item in WORKFLOW_RUNTIME_BUDGETS.values()))
