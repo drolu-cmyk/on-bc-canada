@@ -55,6 +55,29 @@ class FakeLearnerProvider:
         }
 
 
+class FailingCoachProvider(FakeLearnerProvider):
+    def coach(self, context):
+        self._capture("coach", context)
+        raise RuntimeError("simulated model failure")
+
+
+class IncompleteChecklistProvider(FakeLearnerProvider):
+    def prepare_human_review(self, context):
+        payload = self._capture("review", context)
+        item = payload["readiness_requirements"][0]
+        return {
+            "summary": "Incomplete fixture checklist.",
+            "checklist": [
+                {
+                    "capability_id": item["capability_id"],
+                    "standard_id": item["standard_id"],
+                    "review_question": "Review only the first standard.",
+                }
+            ],
+            "reviewer_cautions": [],
+        }
+
+
 class LearnerExecutionGraphTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -203,6 +226,34 @@ class LearnerExecutionGraphTests(unittest.TestCase):
             self.assertNotIn(value, serialized)
         self.assertIn("evaluation_report", serialized)
         self.assertIn("agent-evaluation-proof", serialized)
+
+    def test_model_failure_returns_submission_to_submitted_state(self):
+        submission = self._submit("submission-model-failure-001", complete=True)
+        execution = start_learner_assessment(
+            provider=FailingCoachProvider(),
+            progress_store=self.progress,
+            capability_store=self.capabilities,
+            execution_store=self.execution_store,
+            execution_id="assessment-model-failure-001",
+            submission_id=submission["submission_id"],
+        )
+        self.assertEqual("failed", execution.status)
+        self.assertIn("simulated model failure", execution.failure)
+        self.assertEqual("submitted", self.progress.get_submission(submission["submission_id"])["status"])
+
+    def test_incomplete_review_checklist_fails_closed_and_restores_submission(self):
+        submission = self._submit("submission-checklist-failure-001", complete=True)
+        execution = start_learner_assessment(
+            provider=IncompleteChecklistProvider(),
+            progress_store=self.progress,
+            capability_store=self.capabilities,
+            execution_store=self.execution_store,
+            execution_id="assessment-checklist-failure-001",
+            submission_id=submission["submission_id"],
+        )
+        self.assertEqual("failed", execution.status)
+        self.assertIn("cover each required capability evidence standard", execution.failure)
+        self.assertEqual("submitted", self.progress.get_submission(submission["submission_id"])["status"])
 
     def test_resume_requires_named_reviewer_and_note(self):
         submission = self._submit("submission-review-note-001", complete=True)
