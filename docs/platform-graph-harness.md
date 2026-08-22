@@ -1,18 +1,12 @@
 # Platform Graph Harness
 
-The Platform Graph Harness is the common control layer for GraphKernel workflows.
+The Platform Graph Harness is the common control layer above GraphKernel workflows.
 
-It answers five questions before a graph is trusted:
-
-1. Is this the graph the registry says it is?
-2. Are model agents still bounded to their declared authority?
-3. Are deterministic services within their declared authority?
-4. Do the actual human gates exactly match the registered human gates?
-5. Does every path to a protected state change pass the required human authority first?
+It keeps platform autonomy governable as more specialist agents and graphs are added. A model may propose which workflow should handle an objective, but deterministic code decides whether that graph, data boundary, requested effect, and handoff are allowed.
 
 ## Registered graphs
 
-The first registry contains six GraphKernel workflows:
+The registry contains six GraphKernel workflows:
 
 | Work type | Graph | Human authority |
 | --- | --- | --- |
@@ -23,58 +17,52 @@ The first registry contains six GraphKernel workflows:
 | Career Mobility | `career-mobility` | none; learner guidance only |
 | Employer Workforce | `employer-workforce` | none; organization analysis only |
 
-The Capability Graph and Learning Graph remain reviewed state layers rather than GraphKernel execution workflows. They are not represented as execution graphs merely to make the registry look larger.
+The Capability Graph and Learning Graph remain reviewed state layers rather than GraphKernel execution workflows. They are not represented as execution graphs merely to make the registry larger.
 
-## Registry contract
+## One authoritative registry
 
-`platform_graph_registry.py` records for every execution graph:
+`platform_graph_registry.py` is the single registry for execution-graph contracts. It records:
 
 - work type
-- graph ID
+- graph ID and expected graph version
 - purpose
+- runtime data classes
 - model data classes
-- maximum agent authority
-- maximum deterministic service authority
+- forbidden data classes
+- autonomous effects
+- effects that may reach a human authorization gate
+- effects a graph may execute after the registered authority boundary
+- maximum agent and deterministic-service authority
 - exact human gate nodes and authorities
 - protected state-changing nodes
-- required human authority for each protected state change
+- required human authority for protected changes
+- registered handoffs
 - terminal record
 - whether the graph executes an external effect
 - whether live model execution requires an OpenAI API key
 
-The registry is executable. It loads the actual graph definition from the graph class rather than copying node topology into a second configuration file.
+The registry loads each actual `GraphDefinition`. It does not copy graph topology into a second configuration system.
 
-## Agent and service authority
+## Structural authority checks
 
-Model agents are A1 in every registered graph.
+`platform_graph_harness.py` checks the registry against the real graph definitions.
 
-Some deterministic services are allowed to be A2 when they record an outcome that has already passed the required human decision. Product release records and Business Operations authorization records use this pattern.
+It verifies:
 
-The harness rejects an agent whose authority exceeds the graph contract and rejects a deterministic service whose authority exceeds its declared graph limit.
+1. graph identity and registered version
+2. model agents remain at or below their authority ceiling
+3. deterministic services remain within their declared authority
+4. actual human gates exactly match the registry
+5. every structural path to a protected state change passes the required human authority or higher
+6. handler names do not imply an undeclared external effect
+7. model data is a subset of the graph runtime data boundary
+8. forbidden data never appears in a model data contract
+9. every authorization or consequential execution effect has the required human authority available
+10. every handoff target is registered
 
-## Exact human gates
-
-A graph cannot silently gain or lose a human gate.
-
-The harness compares all human nodes in the actual `GraphDefinition` with the graph contract. Node ID and authority must match exactly.
-
-Examples:
-
-```text
-product-development
-release_review = A3
-
-business-operations
-external_action_review = A3
-financial_commitment_review = A4
-
-learner-execution
-human_assessment = A3
-```
+A human node merely existing somewhere in a graph is not enough. The harness walks every path from the graph start to each protected state change.
 
 ## Protected state changes
-
-Some deterministic nodes change consequential platform state after a human decision. Those nodes are explicitly registered.
 
 Current protected changes include:
 
@@ -90,62 +78,182 @@ learner-execution
 accept_evidence requires A3
 ```
 
-The harness walks every structural path from the graph start to each protected node. A graph fails if even one route reaches that node without first passing the required human authority or higher.
+The current Product Development and Business Operations graphs create authorization records. They do not deploy, publish, contact an external party, or move money.
 
-This is stronger than checking that a human node exists somewhere in the graph.
+Learner Execution is different in one important respect: after the A3 evidence-review decision, deterministic code may write the accepted capability-evidence record to the learner progress store. The model never performs that write.
 
-## External effects
+## Data boundaries
 
-The current registered graphs do not execute external effects.
+Every graph now declares two data boundaries:
 
-Some graphs can create authorization records after human review, but authorization remains separate from execution. The harness also rejects handler names that appear to perform deployment, publication, sending, transfers, payments, messaging, or email when a graph declares that it executes no external effects.
+`runtime_data_classes`
+: Data the local graph runtime may need to operate.
 
-## Deterministic routing
+`model_data_classes`
+: The narrower subset that may be sent to model workers.
 
-`PlatformGraphHarness.route()` resolves an explicit work type to its registered graph contract.
+Examples:
 
-It does not ask a model to guess which graph should run.
+- Learner Execution may use pseudonymous learner and evidence references locally, while its model workers receive only deidentified learning metadata and capability standards.
+- Career Mobility may use a pseudonymous learner instance locally, while model workers receive deidentified accepted-capability metadata and Work Intelligence.
+- Employer Workforce may hold a local organization reference, while model workers receive organization workflow and aggregate metric data only.
 
-Supported work types are:
+The common forbidden model boundary includes raw learner submissions, direct learner identifiers, individual employee records, payment credentials, and production secrets.
+
+## Effects and dispatch modes
+
+A dispatch request declares:
+
+- work type
+- mode
+- requested effect
+- data classes
+
+Modes are:
+
+`analyze`
+: The graph may perform a registered autonomous analysis or preparation effect at A1.
+
+`authorize`
+: The graph may prepare a consequential decision but must stop at the registered human authority.
+
+`execute`
+: Allowed only for effects that the registry explicitly marks executable after the required graph authority boundary.
+
+No current graph may execute external publication, external contact, a financial transaction, production mutation, an employment decision, or credential issuance.
+
+This distinction prevents an authorization record from being mistaken for permission to perform the external action itself.
+
+## Cross-graph handoffs
+
+Handoffs are explicit rather than implicit.
+
+Current registered handoffs include:
 
 ```text
-research_intelligence
-product_development
-business_operations
-learner_execution
-career_mobility
-employer_workforce
+Research Intelligence
+  -> Work Intelligence
+  completed validated finding only
+
+Employer Workforce
+  -> Research Intelligence
+  organization-level capability signal only
+  Research Intelligence must independently validate it
+
+Learner Execution
+  -> Career Mobility
+  pseudonymous learner instance only after A3-accepted capability evidence exists
 ```
 
-An unknown work type fails closed.
+Two boundaries are intentional:
 
-## CI gate
+- Employer Workforce cannot write a capability signal directly into Work Intelligence.
+- Learner Execution cannot pass raw learner submissions into Career Mobility.
 
-The repository validation workflow now includes:
+An unregistered direct handoff fails closed.
 
-```bash
-python -m runtime.run_platform_graph_harness validate
-```
+## Routing
 
-This runs before the wider runtime and graph test suite.
-
-The command prints a machine-readable report for every registered graph and exits non-zero if any contract fails.
-
-Inspect the registry:
-
-```bash
-python -m runtime.run_platform_graph_harness manifest
-```
-
-Resolve one explicit work type:
+The safest route remains explicit deterministic routing:
 
 ```bash
 python -m runtime.run_platform_graph_harness route \
   --work-type learner_execution
 ```
 
+A richer dispatch check validates the data and effect boundary:
+
+```bash
+python -m runtime.run_platform_graph_harness dispatch \
+  --work-type employer_workforce \
+  --mode analyze \
+  --effect analysis \
+  --data-class organization_workflow \
+  --data-class aggregate_metrics
+```
+
+Validate model context separately:
+
+```bash
+python -m runtime.run_platform_graph_harness model-context \
+  --work-type career_mobility \
+  --data-class deidentified_accepted_capability_metadata \
+  --data-class work_intelligence
+```
+
+Validate a handoff:
+
+```bash
+python -m runtime.run_platform_graph_harness handoff \
+  --source-work-type employer_workforce \
+  --target-kind graph \
+  --target-id canadian-work-research \
+  --data-class organization_aggregate \
+  --data-class capability_signal
+```
+
+## Optional Platform Orchestrator Agent
+
+`openai_platform_orchestrator.py` adds a typed, tool-free manager that may propose the first registered work type for a metadata-only objective.
+
+It is deliberately not the routing authority.
+
+The manager:
+
+- can return only one of the six registered work types
+- receives objective metadata, declared data-class labels, mode, and requested effect
+- has no graph-execution tools
+- has no external-action tools
+- cannot create a new work type, authority level, data class, or side effect
+- cannot make a blocked route permissible
+
+After the manager proposes a work type, `PlatformGraphHarness.validate_dispatch()` still makes the deterministic decision.
+
+Live proposal requires `OPENAI_API_KEY`:
+
+```bash
+python -m runtime.run_platform_graph_harness propose \
+  --objective "Assess whether this organization workflow has a justified AI opportunity." \
+  --mode analyze \
+  --effect analysis \
+  --data-class organization_workflow \
+  --data-class aggregate_metrics
+```
+
+## Deterministic evaluation cases
+
+The harness includes a standing case matrix covering boundaries such as:
+
+- public research analysis is allowed
+- production mutation is blocked
+- financial commitment authorization requires A4
+- financial transaction execution is blocked
+- raw learner submissions are blocked from model workflows
+- learner capability-evidence write requires A3
+- accepted capability metadata may support Career Mobility
+- organization-level Employer Workforce analysis is allowed
+- individual employee data is blocked
+
+These cases run as part of the harness validation rather than depending on exact model prose.
+
+## CI gate
+
+The repository validation workflow runs:
+
+```bash
+python -m runtime.run_platform_graph_harness validate
+```
+
+The command validates structural graph contracts and the dispatch case matrix. It exits non-zero when a graph changes authority, bypasses a protected human gate, expands a model data boundary without registry review, introduces an undeclared handoff, or violates a standing dispatch case.
+
+Inspect the full registry:
+
+```bash
+python -m runtime.run_platform_graph_harness manifest
+```
+
 ## Why this layer matters
 
-The graph registry is the point where autonomy becomes governable across the whole platform.
+The registry is the point where platform autonomy becomes independently testable.
 
-A model can change, a specialist can be replaced, and a graph can gain new nodes. The authority contract remains independently testable. If a future change gives an agent too much authority or creates a new path around a human gate, CI stops the change before it reaches `main`.
+Models can change. Specialist agents can be replaced. Graphs can gain new nodes. None of those changes should silently expand authority, data access, or side effects. The harness makes those changes explicit and reviewable before they reach `main`.
