@@ -18,7 +18,7 @@ class PlatformGraphHarnessCliTests(unittest.TestCase):
         self.assertEqual(0, code)
         payload = json.loads(buffer.getvalue())
         self.assertTrue(payload["passed"])
-        self.assertEqual(6, len(payload["graphs"]))
+        self.assertEqual(8, len(payload["graphs"]))
         self.assertTrue(payload["dispatch_cases"]["passed"])
 
     def test_route_returns_explicit_contract_without_model_classification(self):
