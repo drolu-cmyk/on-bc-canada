@@ -29,7 +29,7 @@ The graph kernel does not call a model by itself. Agent providers are injected t
 
 ## Durable research state
 
-`research_store.py` persists one graph execution to SQLite, including state, checkpoints, pending approval, failure state, and the hash-chained event ledger. This is workflow memory, not semantic learner memory. It allows a process to stop at a human gate and resume later without rerunning completed research nodes.
+`research_store.py` persists one graph execution to SQLite, including state, checkpoints, human-review state, failure state, and the hash-chained event ledger. This is workflow memory, not semantic learner memory. It allows a process to stop at a human gate and resume later without rerunning completed research nodes.
 
 The default local database is `local-data/research.sqlite3`. `local-data/` is ignored by Git and is not a production data store.
 
