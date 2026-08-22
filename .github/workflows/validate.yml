@@ -31,6 +31,10 @@ jobs:
         run: python scripts/validate_runtime_observability.py
       - name: Check runtime observability deployment script syntax
         run: bash -n scripts/deploy_runtime_observability.sh
+      - name: Validate durable execution contract
+        run: python scripts/validate_durable_execution.py
+      - name: Check durable execution deployment script syntax
+        run: bash -n scripts/deploy_durable_execution.sh
       - name: Run deterministic curriculum compiler tests
         run: PYTHONPATH=compiler/src python -m unittest discover -s compiler/tests -v
       - name: Validate graph authority contracts
