@@ -1,1 +1,2 @@
 openai-agents>=0.20,<0.21
+boto3>=1.35,<2
