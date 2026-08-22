@@ -48,17 +48,26 @@ aws cloudformation deploy \
     "LegacyWwwDomainName=${LEGACY_WWW_DOMAIN}" \
     "CanonicalOrigin=${CANONICAL_ORIGIN}"
 
-for url in \
-  "https://${LEGACY_ROOT_DOMAIN}/" \
-  "https://${LEGACY_WWW_DOMAIN}/" \
-  "https://${LEGACY_WWW_DOMAIN}/curriculum.html?source=legacy"; do
+verify_redirect() {
+  local url="$1"
+  local expected="$2"
+  local response
+  local status
+  local location
+
   response="$(curl -sSI "${url}")"
   status="$(awk 'NR==1 {print $2}' <<<"${response}")"
   location="$(awk 'BEGIN{IGNORECASE=1} /^location:/ {$1=""; sub(/^ /,""); gsub(/\r/,""); print}' <<<"${response}")"
-  if [[ "${status}" != "301" || "${location}" != "${CANONICAL_ORIGIN}${url#https://${LEGACY_ROOT_DOMAIN}}" && "${location}" != "${CANONICAL_ORIGIN}${url#https://${LEGACY_WWW_DOMAIN}}" ]]; then
-    echo "Redirect verification failed for ${url}: status=${status}, location=${location}" >&2
+  if [[ "${status}" != "301" || "${location}" != "${expected}" ]]; then
+    echo "Redirect verification failed for ${url}: status=${status}, location=${location}, expected=${expected}" >&2
     exit 1
   fi
-done
+}
+
+verify_redirect "https://${LEGACY_ROOT_DOMAIN}/" "${CANONICAL_ORIGIN}/"
+verify_redirect "https://${LEGACY_WWW_DOMAIN}/" "${CANONICAL_ORIGIN}/"
+verify_redirect \
+  "https://${LEGACY_WWW_DOMAIN}/curriculum.html?source=legacy" \
+  "${CANONICAL_ORIGIN}/curriculum.html?source=legacy"
 
 echo "Legacy .ca redirects are live and independent of CloudFront."
