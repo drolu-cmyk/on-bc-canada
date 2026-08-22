@@ -13,9 +13,11 @@ from runtime.openai_business_operations_provider import OpenAIBusinessOperations
 from runtime.openai_career_mobility_provider import OpenAICareerMobilityProvider, build_career_agents
 from runtime.openai_employer_workforce_provider import OpenAIEmployerWorkforceProvider, build_employer_workforce_agents
 from runtime.openai_learner_provider import OpenAILearnerSupportProvider, build_learner_agents
+from runtime.openai_outcomes_provider import OpenAIOutcomesIntelligenceProvider, build_outcomes_agents
 from runtime.openai_platform_orchestrator import OpenAIPlatformOrchestrator, build_platform_orchestrator_agent
 from runtime.openai_product_provider import OpenAIProductDevelopmentProvider, build_product_agents
 from runtime.openai_research_provider import OpenAIResearchProvider, build_research_agents
+from runtime.openai_runtime_assurance_provider import OpenAIRuntimeAssuranceProvider, build_runtime_assurance_agents
 from runtime.platform_graph_registry import GRAPH_CONTRACTS
 
 
@@ -58,6 +60,8 @@ def _sdk_inventory(model: str = "gpt-5.6-sol") -> tuple[dict[str, Any], dict[str
     learner = build_learner_agents(model=model)
     career = build_career_agents(model=model)
     employer = build_employer_workforce_agents(model=model)
+    outcomes = build_outcomes_agents(model=model)
+    runtime_assurance = build_runtime_assurance_agents(model=model)
     orchestrator = build_platform_orchestrator_agent(model=model)
 
     agents = {
@@ -98,6 +102,10 @@ def _sdk_inventory(model: str = "gpt-5.6-sol") -> tuple[dict[str, Any], dict[str
         "ai-adoption-risk-agent": employer.adoption_risk_agent,
         "ai-adoption-pilot-agent": employer.pilot_design_agent,
         "ai-adoption-measurement-agent": employer.measurement_agent,
+        "outcomes-analysis-agent": outcomes.analysis_agent,
+        "outcomes-challenge-agent": outcomes.challenge_agent,
+        "runtime-reliability-agent": runtime_assurance.reliability_agent,
+        "runtime-control-agent": runtime_assurance.control_agent,
         "platform-orchestrator-agent": orchestrator,
     }
 
@@ -109,6 +117,8 @@ def _sdk_inventory(model: str = "gpt-5.6-sol") -> tuple[dict[str, Any], dict[str
         "learner_execution": OpenAILearnerSupportProvider(agents=learner, runner=marker).max_turns,
         "career_mobility": OpenAICareerMobilityProvider(agents=career, runner=marker).max_turns,
         "employer_workforce": OpenAIEmployerWorkforceProvider(agents=employer, runner=marker).max_turns,
+        "outcomes_intelligence": OpenAIOutcomesIntelligenceProvider(agents=outcomes, runner=marker).max_turns,
+        "runtime_assurance": OpenAIRuntimeAssuranceProvider(agents=runtime_assurance, runner=marker).max_turns,
         "platform_orchestration": OpenAIPlatformOrchestrator(agent=orchestrator, runner=marker).max_turns,
     }
     return agents, provider_turns
