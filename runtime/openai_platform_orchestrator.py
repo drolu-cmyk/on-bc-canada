@@ -1,8 +1,8 @@
-"""Typed OpenAI manager that proposes a registered platform workflow.
+"""Typed OpenAI manager that proposes a registered platform work type.
 
 The manager only proposes a route from a metadata-only orchestration envelope.
-PlatformHarness remains the authority for whether that route, data boundary, and
-effect are actually allowed.
+PlatformGraphHarness remains the authority for whether that route, data boundary,
+and requested effect are actually allowed.
 """
 from __future__ import annotations
 
@@ -13,14 +13,14 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
 
-from runtime.platform_harness import DispatchMode
+from runtime.platform_graph_harness import DispatchMode
 
 
-WorkflowKey = Literal[
-    "research_evidence",
-    "product_change",
+WorkType = Literal[
+    "research_intelligence",
+    "product_development",
     "business_operations",
-    "learner_support",
+    "learner_execution",
     "career_mobility",
     "employer_workforce",
 ]
@@ -38,7 +38,7 @@ class OrchestrationEnvelope:
 
 
 class PlatformRouteOutput(BaseModel):
-    workflow_key: WorkflowKey
+    work_type: WorkType
     reason: str
     required_inputs: list[str] = Field(default_factory=list, max_length=12)
     risk_flags: list[str] = Field(default_factory=list, max_length=12)
@@ -56,15 +56,15 @@ def build_platform_orchestrator_agent(model: str | None = None) -> Any:
         name="Platform Orchestrator Agent",
         model=model_name,
         instructions=(
-            "Choose exactly one registered first-step workflow for the supplied platform objective. "
-            "The registered choices are research_evidence, product_change, business_operations, learner_support, career_mobility, and employer_workforce. "
-            "Research_evidence validates changing Canadian work, technology, and capability signals. Product_change coordinates product and platform design work. "
-            "Business_operations covers growth, marketing, partnerships, operations, and finance analysis. Learner_support handles deidentified coaching and evidence-readiness workflow. "
-            "Career_mobility interprets already human-accepted capability evidence for learner guidance. Employer_workforce analyzes organization-level workflows and AI adoption without employee decisions. "
-            "Choose the first necessary workflow when an objective spans several stages; later handoffs are governed outside this model. "
-            "Never invent a workflow, side effect, authority level, data class, credential, hiring decision, financial action, production action, or external contact. "
+            "Choose exactly one registered first-step work type for the supplied platform objective. "
+            "The registered choices are research_intelligence, product_development, business_operations, learner_execution, career_mobility, and employer_workforce. "
+            "Research_intelligence validates changing Canadian work, technology, and capability signals. Product_development coordinates product and platform design work. "
+            "Business_operations covers growth, marketing, partnerships, operations, and finance analysis. Learner_execution handles deidentified coaching and evidence-readiness workflow. "
+            "Career_mobility interprets already human-accepted capability evidence for learner guidance. Employer_workforce analyzes organization-level workflows and bounded AI adoption without employee decisions. "
+            "Choose the first necessary work type when an objective spans several stages; later handoffs are governed outside this model. "
+            "Never invent a work type, side effect, authority level, data class, credential, hiring decision, financial action, production action, or external contact. "
             "Do not ask for raw learner submissions, direct learner identifiers, individual employee performance data, payment credentials, or production secrets. "
-            "Risk flags should identify boundary concerns visible from the envelope only. The deterministic platform harness makes the final routing decision."
+            "Risk flags should identify boundary concerns visible from the envelope only. The deterministic platform graph harness makes the final routing decision."
         ),
         output_type=PlatformRouteOutput,
         tools=[],
@@ -91,7 +91,7 @@ class OpenAIPlatformOrchestrator:
         if not envelope.objective.strip():
             raise ValueError("platform orchestration requires an objective")
         prompt = (
-            "Select the first registered platform workflow for this metadata-only orchestration envelope.\n\n"
+            "Select the first registered platform work type for this metadata-only orchestration envelope.\n\n"
             "INPUT_JSON\n"
             + json.dumps(envelope.as_payload(), ensure_ascii=False, sort_keys=True)
         )
