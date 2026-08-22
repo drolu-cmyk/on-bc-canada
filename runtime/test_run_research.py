@@ -15,6 +15,20 @@ class ResearchCliTests(unittest.TestCase):
         self.assertEqual("status", args.command)
         self.assertEqual("research-1", args.execution_id)
 
+    def test_start_requires_launch_domain(self):
+        with self.assertRaises(SystemExit):
+            build_parser().parse_args(["start", "--question", "What capabilities are changing?"])
+
+    def test_start_accepts_applied_ai_domain(self):
+        args = build_parser().parse_args([
+            "start",
+            "--domain",
+            "applied-ai-systems",
+            "--question",
+            "What capabilities are changing?",
+        ])
+        self.assertEqual("applied-ai-systems", args.domain)
+
     def test_missing_execution_returns_error(self):
         with tempfile.TemporaryDirectory() as tmp:
             code = main([
@@ -33,6 +47,8 @@ class ResearchCliTests(unittest.TestCase):
                     "--db",
                     str(Path(tmp) / "research.sqlite3"),
                     "start",
+                    "--domain",
+                    "applied-ai-systems",
                     "--question",
                     "What capabilities are changing?",
                 ])
