@@ -2,23 +2,10 @@
   "AWSTemplateFormatVersion": "2010-09-09",
   "Description": "Regional HTTPS 301 redirects from legacy SozoRock .ca domains to canada.sozorock.com.",
   "Parameters": {
-    "LegacyHostedZoneId": {
-      "Type": "String",
-      "Default": "Z081121934QL55XA4WUZ",
-      "Description": "Public Route 53 hosted zone ID for sozorock.ca."
-    },
-    "LegacyRootDomainName": {
-      "Type": "String",
-      "Default": "sozorock.ca"
-    },
-    "LegacyWwwDomainName": {
-      "Type": "String",
-      "Default": "www.sozorock.ca"
-    },
-    "CanonicalOrigin": {
-      "Type": "String",
-      "Default": "https://canada.sozorock.com"
-    }
+    "LegacyHostedZoneId": {"Type": "String", "Default": "Z081121934QL55XA4WUZ"},
+    "LegacyRootDomainName": {"Type": "String", "Default": "sozorock.ca"},
+    "LegacyWwwDomainName": {"Type": "String", "Default": "www.sozorock.ca"},
+    "CanonicalOrigin": {"Type": "String", "Default": "https://canada.sozorock.com"}
   },
   "Resources": {
     "RedirectCertificate": {
@@ -40,19 +27,17 @@
           "Version": "2012-10-17",
           "Statement": [{"Effect": "Allow", "Principal": {"Service": "lambda.amazonaws.com"}, "Action": "sts:AssumeRole"}]
         },
-        "Policies": [
-          {
-            "PolicyName": "RedirectFunctionLogs",
-            "PolicyDocument": {
-              "Version": "2012-10-17",
-              "Statement": [{
-                "Effect": "Allow",
-                "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
-                "Resource": {"Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*"}
-              }]
-            }
+        "Policies": [{
+          "PolicyName": "RedirectFunctionLogs",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [{
+              "Effect": "Allow",
+              "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+              "Resource": {"Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*"}
+            }]
           }
-        ]
+        }]
       }
     },
     "RedirectFunction": {
@@ -65,17 +50,13 @@
         "MemorySize": 128,
         "Environment": {"Variables": {"CANONICAL_ORIGIN": {"Ref": "CanonicalOrigin"}}},
         "Code": {
-          "ZipFile": "exports.handler = async (event) => {\n  const origin = process.env.CANONICAL_ORIGIN;\n  const path = event.rawPath || '/';\n  const query = event.rawQueryString ? `?${event.rawQueryString}` : '';\n  return {\n    statusCode: 301,\n    headers: {\n      location: `${origin}${path}${query}`,\n      'cache-control': 'public, max-age=3600'\n    }\n  };\n};\n"
+          "ZipFile": "exports.handler = async (event) => {\n  const origin = process.env.CANONICAL_ORIGIN;\n  const path = event.rawPath || '/';\n  const query = event.rawQueryString ? `?${event.rawQueryString}` : '';\n  return {\n    statusCode: 301,\n    headers: { location: `${origin}${path}${query}`, 'cache-control': 'public, max-age=3600' }\n  };\n};\n"
         }
       }
     },
     "RedirectApi": {
       "Type": "AWS::ApiGatewayV2::Api",
-      "Properties": {
-        "Name": "sozorock-ca-legacy-redirect",
-        "ProtocolType": "HTTP",
-        "IpAddressType": "dualstack"
-      }
+      "Properties": {"Name": "sozorock-ca-legacy-redirect", "ProtocolType": "HTTP", "IpAddressType": "dualstack"}
     },
     "RedirectIntegration": {
       "Type": "AWS::ApiGatewayV2::Integration",
@@ -96,11 +77,7 @@
     },
     "RedirectStage": {
       "Type": "AWS::ApiGatewayV2::Stage",
-      "Properties": {
-        "ApiId": {"Ref": "RedirectApi"},
-        "StageName": "$default",
-        "AutoDeploy": true
-      }
+      "Properties": {"ApiId": {"Ref": "RedirectApi"}, "StageName": "$default", "AutoDeploy": true}
     },
     "RedirectInvokePermission": {
       "Type": "AWS::Lambda::Permission",
@@ -138,53 +115,19 @@
     "RootMapping": {
       "Type": "AWS::ApiGatewayV2::ApiMapping",
       "DependsOn": "RedirectStage",
-      "Properties": {"ApiId": {"Ref": "RedirectApi"}, "DomainName": {"Ref": "RootDomain"}, "Stage": "$default"}
+      "Properties": {"ApiId": {"Ref": "RedirectApi"}, "DomainName": {"Ref": "RootDomain"}, "Stage": {"Ref": "RedirectStage"}}
     },
     "WwwMapping": {
       "Type": "AWS::ApiGatewayV2::ApiMapping",
       "DependsOn": "RedirectStage",
-      "Properties": {"ApiId": {"Ref": "RedirectApi"}, "DomainName": {"Ref": "WwwDomain"}, "Stage": "$default"}
-    },
-    "RootA": {
-      "Type": "AWS::Route53::RecordSet",
-      "Properties": {
-        "HostedZoneId": {"Ref": "LegacyHostedZoneId"},
-        "Name": {"Ref": "LegacyRootDomainName"},
-        "Type": "A",
-        "AliasTarget": {"DNSName": {"Fn::GetAtt": ["RootDomain", "RegionalDomainName"]}, "HostedZoneId": {"Fn::GetAtt": ["RootDomain", "RegionalHostedZoneId"]}, "EvaluateTargetHealth": false}
-      }
-    },
-    "RootAAAA": {
-      "Type": "AWS::Route53::RecordSet",
-      "Properties": {
-        "HostedZoneId": {"Ref": "LegacyHostedZoneId"},
-        "Name": {"Ref": "LegacyRootDomainName"},
-        "Type": "AAAA",
-        "AliasTarget": {"DNSName": {"Fn::GetAtt": ["RootDomain", "RegionalDomainName"]}, "HostedZoneId": {"Fn::GetAtt": ["RootDomain", "RegionalHostedZoneId"]}, "EvaluateTargetHealth": false}
-      }
-    },
-    "WwwA": {
-      "Type": "AWS::Route53::RecordSet",
-      "Properties": {
-        "HostedZoneId": {"Ref": "LegacyHostedZoneId"},
-        "Name": {"Ref": "LegacyWwwDomainName"},
-        "Type": "A",
-        "AliasTarget": {"DNSName": {"Fn::GetAtt": ["WwwDomain", "RegionalDomainName"]}, "HostedZoneId": {"Fn::GetAtt": ["WwwDomain", "RegionalHostedZoneId"]}, "EvaluateTargetHealth": false}
-      }
-    },
-    "WwwAAAA": {
-      "Type": "AWS::Route53::RecordSet",
-      "Properties": {
-        "HostedZoneId": {"Ref": "LegacyHostedZoneId"},
-        "Name": {"Ref": "LegacyWwwDomainName"},
-        "Type": "AAAA",
-        "AliasTarget": {"DNSName": {"Fn::GetAtt": ["WwwDomain", "RegionalDomainName"]}, "HostedZoneId": {"Fn::GetAtt": ["WwwDomain", "RegionalHostedZoneId"]}, "EvaluateTargetHealth": false}
-      }
+      "Properties": {"ApiId": {"Ref": "RedirectApi"}, "DomainName": {"Ref": "WwwDomain"}, "Stage": {"Ref": "RedirectStage"}}
     }
   },
   "Outputs": {
-    "LegacyRootRedirect": {"Value": {"Ref": "LegacyRootDomainName"}},
-    "LegacyWwwRedirect": {"Value": {"Ref": "LegacyWwwDomainName"}},
+    "RootRegionalDomainName": {"Value": {"Fn::GetAtt": ["RootDomain", "RegionalDomainName"]}},
+    "RootRegionalHostedZoneId": {"Value": {"Fn::GetAtt": ["RootDomain", "RegionalHostedZoneId"]}},
+    "WwwRegionalDomainName": {"Value": {"Fn::GetAtt": ["WwwDomain", "RegionalDomainName"]}},
+    "WwwRegionalHostedZoneId": {"Value": {"Fn::GetAtt": ["WwwDomain", "RegionalHostedZoneId"]}},
     "CanonicalOrigin": {"Value": {"Ref": "CanonicalOrigin"}}
   }
 }
