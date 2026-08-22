@@ -17,8 +17,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install validators
-        run: python -m pip install --disable-pip-version-check pyyaml jsonschema
+      - name: Install validators and agent runtime
+        run: python -m pip install --disable-pip-version-check pyyaml jsonschema -r runtime/requirements-agentic.txt
       - name: Validate contracts and claims
         run: python scripts/validate_specs.py
       - name: Validate public copy
