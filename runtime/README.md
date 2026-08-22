@@ -16,6 +16,7 @@ The runtime folder keeps provider-neutral contracts executable before cloud serv
 - node evidence;
 - evaluator gates;
 - human approval interrupts;
+- reviewed denial routes when a graph explicitly defines them;
 - execution traces through the existing hash-chained event ledger;
 - idempotent execution creation.
 
@@ -85,6 +86,18 @@ Analysis and preparation can finish directly when no blocker exists. External pu
 
 `graph_execution_store.py` is the first generic durable graph-state store. `business_operations_runner.py` and `run_business_operations.py` use it so A3/A4 work can survive a restart without regenerating specialist analysis.
 
+## Learner Execution graph
+
+`learner_progress_store.py` freezes an active learning-path version for a pseudonymous learner reference, tracks sprint and lab progress, records mission submission references, and stores human-accepted capability evidence.
+
+`learner_execution_graph.py` uses deterministic evidence-readiness checks before model work. The model context excludes learner reference, cohort ID, submission ID, raw artifact references, attendance, support records, credentials, and learner submission content.
+
+`openai_learner_provider.py` supplies three typed, tool-free A1 workers: Learning Coach Agent, Learner Progress Agent, and Human Review Preparation Agent. They use deidentified program and progress metadata. They cannot grade, certify, remove a learner, or accept capability evidence.
+
+A metadata-complete mission stops at an A3 human evidence-review gate. Acceptance records capability evidence through the learner progress store. A non-acceptance can follow an explicit `denied` graph route to learner revision without being treated as a system failure.
+
+`learner_execution_runner.py` and `run_learner_execution.py` provide durable start, status, and human-review operations through `graph_execution_store.py`.
+
 Install the agent runtime dependencies before live agent use:
 
 ```bash
@@ -125,4 +138,4 @@ Run the tests from the repository root:
 python -m unittest discover -s runtime -p 'test_*.py' -v
 ```
 
-The test suite does not make live model calls. It checks graph execution, persistence, stop-and-resume behavior, domain specialization, provider contracts, Work Intelligence, Capability Graph authority, Learning Graph sequence and evidence rules, Product Development release authority, Business Operations A3/A4 routing, command boundaries, and installed SDK construction.
+The test suite does not make live model calls. It checks graph execution, persistence, stop-and-resume behavior, domain specialization, provider contracts, Work Intelligence, Capability Graph authority, Learning Graph sequence and evidence rules, Product Development release authority, Business Operations A3/A4 routing, Learner Execution privacy and evidence-review boundaries, command boundaries, and installed SDK construction.

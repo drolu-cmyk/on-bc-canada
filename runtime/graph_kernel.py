@@ -92,9 +92,22 @@ Evaluator = Callable[[dict[str, Any], NodeResult], tuple[bool, str]]
 class GraphKernel:
     """Execute one graph deterministically around injected reasoning handlers."""
 
-    def __init__(self, *, program_id: str = "applied-ai-training-canada", ledger: EventLedger | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        program_id: str = "applied-ai-training-canada",
+        ledger: EventLedger | None = None,
+        event_privacy_class: str = "internal_operational",
+        event_retention_class: str = "quality_record",
+        event_learner_id: str | None = None,
+        event_cohort_id: str | None = None,
+    ) -> None:
         self.program_id = program_id
         self.ledger = ledger or EventLedger()
+        self.event_privacy_class = event_privacy_class
+        self.event_retention_class = event_retention_class
+        self.event_learner_id = event_learner_id
+        self.event_cohort_id = event_cohort_id
         self.handlers: dict[str, Handler] = {}
         self.evaluators: dict[str, Evaluator] = {}
         self.executions: dict[str, GraphExecution] = {}
@@ -203,22 +216,36 @@ class GraphKernel:
         self._assert_definition(definition, execution)
         if execution.status != "waiting_approval" or not execution.pending_approval:
             raise ValueError("execution is not waiting for approval")
+        if not approver_id.strip():
+            raise ValueError("approver ID is required")
         node_id = execution.pending_approval["node_id"]
-        self._event(
-            execution,
-            "graph.approval_decided.v1",
-            {"node_id": node_id, "approved": approved, "approver_id": approver_id, "note": note},
-        )
+        decision = {
+            "node_id": node_id,
+            "approved": approved,
+            "approver_id": approver_id,
+            "note": note,
+        }
+        self._event(execution, "graph.approval_decided.v1", decision)
         execution.history.append({"node_id": node_id, "actor_id": approver_id, "approved": approved, "note": note})
+        execution.state.setdefault("human_decisions", {})[node_id] = deepcopy(decision)
         execution.checkpoints.append({
             "node_id": node_id,
             "state": deepcopy(execution.state),
             "history_length": len(execution.history),
         })
         execution.pending_approval = None
+
+        route = "approved" if approved else "denied"
         if not approved:
-            return self._fail(execution, f"human approval denied at {node_id}")
-        next_node = self._next(definition, node_id, "approved")
+            denied_edges = [edge for edge in definition.edges if edge.source == node_id and edge.route == "denied"]
+            if not denied_edges:
+                return self._fail(execution, f"human approval denied at {node_id}")
+            if len(denied_edges) > 1:
+                return self._fail(execution, f"ambiguous denied edges from {node_id}")
+            next_node = denied_edges[0].target
+        else:
+            next_node = self._next(definition, node_id, route)
+
         if next_node is None:
             execution.status = "completed"
             self._event(execution, "graph.execution_completed.v1", {"final_node": node_id})
@@ -265,8 +292,10 @@ class GraphKernel:
             correlation_id=f"corr-{execution.execution_id}",
             idempotency_key=f"graph:{execution.execution_id}:{event_type}:{sequence}",
             payload={"graph_id": execution.graph_id, "graph_version": execution.graph_version, **payload},
-            privacy_class="internal_operational",
-            retention_class="quality_record",
+            learner_id=self.event_learner_id,
+            cohort_id=self.event_cohort_id,
+            privacy_class=self.event_privacy_class,
+            retention_class=self.event_retention_class,
         )
 
     def _fail(self, execution: GraphExecution, reason: str) -> GraphExecution:
