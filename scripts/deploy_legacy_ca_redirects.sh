@@ -14,17 +14,14 @@ if [[ "${actual_account}" != "${AWS_ACCOUNT_ID}" ]]; then
   echo "AWS account mismatch: expected ${AWS_ACCOUNT_ID}, received ${actual_account}" >&2
   exit 1
 fi
-
 if [[ "${AWS_REGION}" != "ca-central-1" ]]; then
   echo "Legacy redirect service must run in ca-central-1." >&2
   exit 1
 fi
-
 if [[ "${LEGACY_ROOT_DOMAIN}" != "sozorock.ca" || "${LEGACY_WWW_DOMAIN}" != "www.sozorock.ca" ]]; then
   echo "Unexpected legacy hostname." >&2
   exit 1
 fi
-
 if [[ "${CANONICAL_ORIGIN}" != "https://canada.sozorock.com" ]]; then
   echo "Unexpected canonical redirect target." >&2
   exit 1
@@ -48,6 +45,68 @@ aws cloudformation deploy \
     "LegacyWwwDomainName=${LEGACY_WWW_DOMAIN}" \
     "CanonicalOrigin=${CANONICAL_ORIGIN}"
 
+stack_output() {
+  aws cloudformation describe-stacks \
+    --region "${AWS_REGION}" \
+    --stack-name "${STACK_NAME}" \
+    --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" \
+    --output text
+}
+
+replace_dns_with_api_gateway() {
+  local record_name="$1"
+  local target_domain="$2"
+  local target_zone="$3"
+  local records
+  local unsafe
+  local deletes
+  local change_batch
+  local change_id
+
+  records="$(aws route53 list-resource-record-sets \
+    --hosted-zone-id "${LEGACY_HOSTED_ZONE_ID}" \
+    --output json | jq -c --arg name "${record_name}." \
+      '[.ResourceRecordSets[] | select(.Name == $name and (.Type == "A" or .Type == "AAAA" or .Type == "CNAME"))]')"
+
+  unsafe="$(jq -r '
+    .[] |
+    if .Type == "CNAME" then .ResourceRecords[]?.Value
+    elif has("AliasTarget") then .AliasTarget.DNSName
+    else "literal-address-record" end
+    | select(((ascii_downcase | rtrimstr(".")) | endswith(".cloudfront.net")) | not)
+  ' <<<"${records}")"
+  if [[ -n "${unsafe}" ]]; then
+    echo "Refusing to replace unrelated DNS at ${record_name}: ${unsafe//$'\n'/, }" >&2
+    exit 1
+  fi
+
+  deletes="$(jq -c '[.[] | {Action:"DELETE",ResourceRecordSet:.}]' <<<"${records}")"
+  change_batch="$(jq -cn \
+    --arg name "${record_name}." \
+    --arg dns "${target_domain%.}." \
+    --arg zone "${target_zone}" \
+    --argjson deletes "${deletes}" \
+    '{Changes: ($deletes + [
+      {Action:"UPSERT",ResourceRecordSet:{Name:$name,Type:"A",AliasTarget:{HostedZoneId:$zone,DNSName:$dns,EvaluateTargetHealth:false}}},
+      {Action:"UPSERT",ResourceRecordSet:{Name:$name,Type:"AAAA",AliasTarget:{HostedZoneId:$zone,DNSName:$dns,EvaluateTargetHealth:false}}}
+    ])}')"
+
+  change_id="$(aws route53 change-resource-record-sets \
+    --hosted-zone-id "${LEGACY_HOSTED_ZONE_ID}" \
+    --change-batch "${change_batch}" \
+    --query 'ChangeInfo.Id' \
+    --output text)"
+  aws route53 wait resource-record-sets-changed --id "${change_id}"
+}
+
+root_domain="$(stack_output RootRegionalDomainName)"
+root_zone="$(stack_output RootRegionalHostedZoneId)"
+www_domain="$(stack_output WwwRegionalDomainName)"
+www_zone="$(stack_output WwwRegionalHostedZoneId)"
+
+replace_dns_with_api_gateway "${LEGACY_ROOT_DOMAIN}" "${root_domain}" "${root_zone}"
+replace_dns_with_api_gateway "${LEGACY_WWW_DOMAIN}" "${www_domain}" "${www_zone}"
+
 verify_redirect() {
   local url="$1"
   local expected="$2"
@@ -66,8 +125,6 @@ verify_redirect() {
 
 verify_redirect "https://${LEGACY_ROOT_DOMAIN}/" "${CANONICAL_ORIGIN}/"
 verify_redirect "https://${LEGACY_WWW_DOMAIN}/" "${CANONICAL_ORIGIN}/"
-verify_redirect \
-  "https://${LEGACY_WWW_DOMAIN}/curriculum.html?source=legacy" \
-  "${CANONICAL_ORIGIN}/curriculum.html?source=legacy"
+verify_redirect "https://${LEGACY_WWW_DOMAIN}/curriculum.html?source=legacy" "${CANONICAL_ORIGIN}/curriculum.html?source=legacy"
 
 echo "Legacy .ca redirects are live and independent of CloudFront."
