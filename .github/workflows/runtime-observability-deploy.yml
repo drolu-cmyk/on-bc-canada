@@ -1,0 +1,76 @@
+name: Deploy runtime observability to AWS Canada
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Runtime observability environment label
+        required: true
+        default: pilot
+        type: string
+      retention_days:
+        description: CloudWatch telemetry retention days
+        required: true
+        default: "30"
+        type: string
+      alarm_email:
+        description: Optional email address for CloudWatch alarm notifications
+        required: false
+        default: ""
+        type: string
+      daily_token_threshold:
+        description: Daily token alarm threshold
+        required: true
+        default: "1000000"
+        type: string
+      daily_estimated_cost_threshold_usd:
+        description: Daily estimated model-cost alarm threshold in USD
+        required: true
+        default: "5"
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  AWS_ACCOUNT_ID: "891377012881"
+  AWS_REGION: ca-central-1
+  RUNTIME_OBSERVABILITY_STACK_NAME: sozorock-ca-runtime-observability
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate runtime observability source
+        run: python scripts/validate_runtime_observability.py
+      - name: Check deployment script syntax
+        run: bash -n scripts/deploy_runtime_observability.sh
+
+  deploy:
+    if: vars.RUNTIME_OBSERVABILITY_DEPLOYMENT_ENABLED == 'true' && vars.RUNTIME_OBSERVABILITY_DEPLOY_ROLE_ARN != ''
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials with GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v6.2.3
+        with:
+          role-to-assume: ${{ vars.RUNTIME_OBSERVABILITY_DEPLOY_ROLE_ARN }}
+          aws-region: ca-central-1
+          role-session-name: sozorock-ca-runtime-observability-${{ github.run_id }}
+          allowed-account-ids: "891377012881"
+      - name: Deploy runtime observability
+        env:
+          RUNTIME_OBSERVABILITY_ENVIRONMENT: ${{ inputs.environment }}
+          RUNTIME_OBSERVABILITY_RETENTION_DAYS: ${{ inputs.retention_days }}
+          RUNTIME_OBSERVABILITY_ALARM_EMAIL: ${{ inputs.alarm_email }}
+          RUNTIME_DAILY_TOKEN_THRESHOLD: ${{ inputs.daily_token_threshold }}
+          RUNTIME_DAILY_ESTIMATED_COST_THRESHOLD_USD: ${{ inputs.daily_estimated_cost_threshold_usd }}
+        run: bash scripts/deploy_runtime_observability.sh
