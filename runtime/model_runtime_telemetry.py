@@ -359,8 +359,16 @@ class ModelTelemetryStore:
 class PrivacySafeTelemetryProcessor:
     """Secondary SDK tracing processor that stores no trace payload bodies."""
 
-    def __init__(self, store: ModelTelemetryStore | None = None) -> None:
+    def __init__(self, store: ModelTelemetryStore | None = None, aws_publisher: Any | None = None) -> None:
         self.store = store or ModelTelemetryStore()
+        if aws_publisher is None:
+            try:
+                from runtime.aws_runtime_observability import CloudWatchTelemetryPublisher
+
+                aws_publisher = CloudWatchTelemetryPublisher.from_environment(store_path=self.store.path)
+            except Exception:
+                aws_publisher = None
+        self.aws_publisher = aws_publisher
         self._tracked: dict[str, float] = {}
         self._lock = threading.RLock()
 
@@ -390,6 +398,13 @@ class PrivacySafeTelemetryProcessor:
             self.store.end_trace(trace_id, started_monotonic=started)
         except Exception:
             return
+        if self.aws_publisher is not None:
+            try:
+                self.aws_publisher.publish_trace(trace_id)
+            except Exception:
+                # Centralized telemetry is secondary. A CloudWatch failure cannot
+                # widen authority or fail the governed model workflow.
+                pass
 
     def on_span_start(self, span: Any) -> None:
         return None
