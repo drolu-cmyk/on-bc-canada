@@ -145,7 +145,23 @@ class LearnerProgressStore:
                 (instance_id,),
             ).fetchone()
             if existing:
+                expected = {
+                    "learner_ref": learner_ref,
+                    "cohort_id": cohort_id,
+                    "pathway_id": pathway_id,
+                }
+                if any(existing[field] != value for field, value in expected.items()):
+                    raise ValueError("existing learner path instance does not match requested learner, cohort, or pathway")
                 return self.get_instance(instance_id)
+            binding = connection.execute(
+                """
+                SELECT instance_id FROM learner_path_instances
+                WHERE learner_ref = ? AND cohort_id = ? AND pathway_id = ?
+                """,
+                (learner_ref, cohort_id, pathway_id),
+            ).fetchone()
+            if binding is not None:
+                raise ValueError("learner, cohort, and pathway are already bound to a different path instance")
             connection.execute(
                 """
                 INSERT INTO learner_path_instances (
@@ -253,12 +269,24 @@ class LearnerProgressStore:
         if unit["status"] not in {"available", "in_progress"}:
             raise ValueError("mission is not available for submission")
         mission = next(item for item in instance["path_snapshot"]["units"] if item["unit_id"] == unit_id)
+        expected_submission = {
+            "instance_id": instance_id,
+            "unit_id": unit_id,
+            "artifact_refs_json": _dumps(list(artifact_refs)),
+            "artifact_types_json": _dumps(list(artifact_types)),
+            "revision_ref": revision_ref,
+            "defense_response_ref": defense_response_ref,
+            "changed_scenario_response_ref": changed_scenario_response_ref,
+            "mission_requirements_json": _dumps(mission["evidence_requirements"]),
+        }
         with self._connect() as connection:
             existing = connection.execute(
                 "SELECT * FROM learner_submissions WHERE submission_id = ?",
                 (submission_id,),
             ).fetchone()
             if existing:
+                if any(existing[field] != value for field, value in expected_submission.items()):
+                    raise ValueError("existing learner submission does not match requested mission evidence")
                 return self.get_submission(submission_id)
             attempt = connection.execute(
                 "SELECT COALESCE(MAX(attempt_number), 0) + 1 AS next_attempt FROM learner_submissions WHERE instance_id = ? AND unit_id = ?",
@@ -279,12 +307,12 @@ class LearnerProgressStore:
                     instance_id,
                     unit_id,
                     attempt,
-                    _dumps(list(artifact_refs)),
-                    _dumps(list(artifact_types)),
+                    expected_submission["artifact_refs_json"],
+                    expected_submission["artifact_types_json"],
                     revision_ref,
                     defense_response_ref,
                     changed_scenario_response_ref,
-                    _dumps(mission["evidence_requirements"]),
+                    expected_submission["mission_requirements_json"],
                     now,
                     now,
                 ),
@@ -377,7 +405,6 @@ class LearnerProgressStore:
                 (now, submission["instance_id"], submission["unit_id"]),
             )
         self._unlock_ready_units(submission["instance_id"])
-        self._complete_instance_if_ready(submission["instance_id"])
         self._append_event(
             submission["instance_id"],
             "learner.capability_evidence_accepted.v1",
@@ -388,6 +415,7 @@ class LearnerProgressStore:
             },
             retention_class="quality_record",
         )
+        self._complete_instance_if_ready(submission["instance_id"])
         return self.get_submission(submission_id)
 
     def reject_mission_evidence(
