@@ -21,7 +21,7 @@ The Platform Graph Harness still owns graph routing, data/effect boundaries, hum
 
 `runtime/agent_identity_registry.py` contains one record for every current model worker.
 
-There are 38 identities at launch:
+There are 42 controlled identities in the current platform:
 
 - 7 Research Intelligence agents
 - 10 Product Development agents
@@ -29,7 +29,11 @@ There are 38 identities at launch:
 - 3 Learner Execution agents
 - 5 Career Mobility agents
 - 7 Employer Workforce agents
+- 2 Outcomes Intelligence agents
+- 2 Runtime Assurance agents
 - 1 Platform Orchestrator agent
+
+Forty-one identities belong to registered GraphKernel workflows. The Platform Orchestrator sits above those graphs as a proposal-only manager.
 
 An identity uses the form:
 
@@ -42,8 +46,8 @@ Examples:
 ```text
 nhi:canada-platform:research-director-agent
 nhi:canada-platform:security-agent
-nhi:canada-platform:finance-agent
-nhi:canada-platform:learning-coach-agent
+nhi:canada-platform:outcomes-analysis-agent
+nhi:canada-platform:runtime-control-agent
 nhi:canada-platform:platform-orchestrator-agent
 ```
 
@@ -78,7 +82,7 @@ Their registered tool label is:
 hosted_web_search
 ```
 
-All Product, Business, Learner, Career, Employer, and Platform Orchestrator workers are tool-free in the current release.
+All Product, Business, Learner, Career, Employer, Outcomes Intelligence, Runtime Assurance, and Platform Orchestrator workers are tool-free in the current release.
 
 The policy does not grant repository write, cloud mutation, messaging, payment, credential issuance, production deployment, or employee-decision tools to any model worker.
 
@@ -94,6 +98,8 @@ The registry records the provider turn limit for each worker and a maximum numbe
 | Learner Execution | 3 | 6 | 3 |
 | Career Mobility | 5 | 6 | 5 |
 | Employer Workforce | 7 | 7 | 7 |
+| Outcomes Intelligence | 2 | 6 | 2 |
+| Runtime Assurance | 2 | 6 | 2 |
 | Platform Orchestration | 1 | 6 | 1 |
 
 Business Operations has five specialists but deterministic routing selects only one workstream agent in an execution.
@@ -116,13 +122,13 @@ SOZOROCK_DISABLED_WORK_TYPES
 Example:
 
 ```text
-SOZOROCK_DISABLED_AGENT_IDS=security-agent,finance-agent
+SOZOROCK_DISABLED_AGENT_IDS=security-agent,runtime-control-agent
 ```
 
 A whole work type can be stopped:
 
 ```text
-SOZOROCK_DISABLED_WORK_TYPES=business_operations
+SOZOROCK_DISABLED_WORK_TYPES=runtime_assurance
 ```
 
 A third control can contract the global turn ceiling:
@@ -147,13 +153,13 @@ It verifies:
 - the identity or work type is not disabled
 - the effective turn ceiling has not fallen below the provider contract
 
-Generic unregistered GraphKernel fixtures and extension graphs remain usable. CI separately requires every agent in the six registered platform graphs to have an NHI record before merge.
+Generic unregistered GraphKernel fixtures and extension graphs remain usable. CI separately requires every agent in the eight registered platform graphs to have an NHI record before merge.
 
 The Platform Orchestrator sits outside GraphKernel, so `openai_platform_orchestrator.py` calls the SDK-level guard directly before `Runner.run_sync`.
 
 ## SDK construction audit
 
-`runtime/agent_identity_audit.py` reconstructs every current SDK agent without making a model call.
+`runtime/agent_identity_audit.py` reconstructs all 42 current SDK workers without making a model call.
 
 It reconciles:
 
@@ -180,7 +186,7 @@ The audit checks:
 - every registered identity has a constructed SDK worker
 - no constructed SDK worker is missing an identity
 
-This catches a source change such as adding a tool to Marketing or Security even if the graph topology itself does not change.
+This catches a source change such as adding a tool to Marketing, Outcomes Analysis, Runtime Control, or Security even if the graph topology itself does not change.
 
 ## Operator commands
 
