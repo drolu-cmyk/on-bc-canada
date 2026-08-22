@@ -1,6 +1,6 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "Private S3 origin and CloudFront distribution for the SozoRock Canada public site.",
+  "Description": "Private S3 origin and CloudFront distribution for the canonical SozoRock Canada public site.",
   "Parameters": {
     "PublicSiteBucketName": {
       "Type": "String",
@@ -18,28 +18,16 @@
       "Description": "Canonical hostname for the Canada public site.",
       "AllowedPattern": "^[a-z0-9.-]+$"
     },
-    "LegacyRootDomainName": {
-      "Type": "String",
-      "Default": "sozorock.ca",
-      "Description": "Legacy apex hostname retained for permanent redirects.",
-      "AllowedPattern": "^[a-z0-9.-]+$"
-    },
-    "LegacyWwwDomainName": {
-      "Type": "String",
-      "Default": "www.sozorock.ca",
-      "Description": "Legacy www hostname retained for permanent redirects.",
-      "AllowedPattern": "^[a-z0-9.-]+$"
-    },
     "CertificateArn": {
       "Type": "String",
-      "Description": "AWS Certificate Manager certificate ARN in us-east-1 covering the canonical and legacy hostnames.",
+      "Description": "AWS Certificate Manager certificate ARN in us-east-1 covering the canonical hostname.",
       "AllowedPattern": "^arn:[^:]+:acm:us-east-1:[0-9]{12}:certificate/[0-9a-f-]+$"
     },
     "PublishAlias": {
       "Type": "String",
-      "Default": "false",
+      "Default": "true",
       "AllowedValues": ["true", "false"],
-      "Description": "Attach the canonical and legacy hostnames after any external CloudFront associations have been transferred."
+      "Description": "Attach only the canonical Canada hostname. Legacy .ca redirects are deployed separately."
     }
   },
   "Conditions": {
@@ -81,18 +69,6 @@
         }
       }
     },
-    "LegacyDomainRedirectFunction": {
-      "Type": "AWS::CloudFront::Function",
-      "Properties": {
-        "AutoPublish": true,
-        "Name": {"Fn::Sub": "${AWS::StackName}-legacy-domain-redirect"},
-        "FunctionConfig": {
-          "Comment": "Permanently redirect sozorock.ca and www.sozorock.ca to canada.sozorock.com while preserving path and query string.",
-          "Runtime": "cloudfront-js-2.0"
-        },
-        "FunctionCode": "function queryString(q) {\n  var parts = [];\n  for (var key in q) {\n    if (!Object.prototype.hasOwnProperty.call(q, key)) continue;\n    var item = q[key];\n    if (item.multiValue) {\n      for (var i = 0; i < item.multiValue.length; i++) {\n        parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(item.multiValue[i].value || ''));\n      }\n    } else {\n      parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(item.value || ''));\n    }\n  }\n  return parts.length ? '?' + parts.join('&') : '';\n}\n\nfunction handler(event) {\n  var request = event.request;\n  var host = request.headers.host ? request.headers.host.value.toLowerCase() : '';\n  if (host === 'sozorock.ca' || host === 'www.sozorock.ca') {\n    return {\n      statusCode: 301,\n      statusDescription: 'Moved Permanently',\n      headers: {\n        location: { value: 'https://canada.sozorock.com' + request.uri + queryString(request.querystring) },\n        'cache-control': { value: 'public, max-age=3600' }\n      }\n    };\n  }\n  return request;\n}\n"
-      }
-    },
     "PublicSiteDistribution": {
       "Type": "AWS::CloudFront::Distribution",
       "Properties": {
@@ -119,13 +95,7 @@
             "ForwardedValues": {
               "QueryString": false,
               "Cookies": {"Forward": "none"}
-            },
-            "FunctionAssociations": [
-              {
-                "EventType": "viewer-request",
-                "FunctionARN": {"Fn::GetAtt": ["LegacyDomainRedirectFunction", "FunctionARN"]}
-              }
-            ]
+            }
           },
           "CustomErrorResponses": [
             {"ErrorCode": 403, "ResponseCode": 404, "ResponsePagePath": "/404.html", "ErrorCachingMinTTL": 60},
@@ -134,11 +104,7 @@
           "Aliases": {
             "Fn::If": [
               "PublishCustomDomain",
-              [
-                {"Ref": "CanonicalDomainName"},
-                {"Ref": "LegacyRootDomainName"},
-                {"Ref": "LegacyWwwDomainName"}
-              ],
+              [{"Ref": "CanonicalDomainName"}],
               {"Ref": "AWS::NoValue"}
             ]
           },
