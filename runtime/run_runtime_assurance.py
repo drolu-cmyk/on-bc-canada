@@ -14,7 +14,7 @@ from runtime.aws_runtime_observability import (
     apply_cloudwatch_runtime_to_snapshot,
     aws_observability_enabled,
 )
-from runtime.graph_execution_store import GraphExecutionStore
+from runtime.execution_store_factory import create_execution_store
 from runtime.model_runtime_telemetry import telemetry_db_path
 from runtime.openai_runtime_assurance_provider import OpenAIRuntimeAssuranceProvider
 from runtime.runtime_assurance import RuntimeAssuranceSnapshotBuilder, RuntimeStoreSource
@@ -68,7 +68,7 @@ def _snapshot(args: argparse.Namespace) -> dict[str, object]:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    store = GraphExecutionStore(args.execution_db)
+    store = create_execution_store(local_path=args.execution_db)
     try:
         if args.command == "start":
             execution = start_runtime_assurance(
