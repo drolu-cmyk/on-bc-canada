@@ -13,7 +13,9 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
 
+from runtime.agent_identity_registry import LEARNING_DESIGN_DATA, assert_agent_runtime_allowed
 from runtime.learning_graph import EvidenceRequirement, LearningPathDefinition, LearningUnit
+from runtime.model_runtime_telemetry import model_runtime_context
 
 
 class EvidenceRequirementOutput(BaseModel):
@@ -93,12 +95,22 @@ class OpenAILearningDesignProvider:
         self.max_turns = max_turns
 
     def propose(self, context: LearningDesignContext) -> LearningPathDefinition:
-        result = self.runner.run_sync(
+        assert_agent_runtime_allowed(
             self.agent,
-            "Design the candidate Learning Graph from this reviewed capability context.\n\nINPUT_JSON\n"
-            + json.dumps(context.as_payload(), ensure_ascii=False, sort_keys=True),
-            max_turns=self.max_turns,
+            requested_max_turns=self.max_turns,
+            declared_model_data_classes=LEARNING_DESIGN_DATA,
         )
+        with model_runtime_context(
+            actor_id="learning-design-agent",
+            execution_id=f"learning-design:{context.pathway_id}:{context.version}",
+            node_id="design_learning_graph",
+        ):
+            result = self.runner.run_sync(
+                self.agent,
+                "Design the candidate Learning Graph from this reviewed capability context.\n\nINPUT_JSON\n"
+                + json.dumps(context.as_payload(), ensure_ascii=False, sort_keys=True),
+                max_turns=self.max_turns,
+            )
         output = result.final_output
         if not isinstance(output, LearningPathOutput):
             raise TypeError("learning design agent returned untyped output")

@@ -12,6 +12,7 @@ from typing import Any, Callable, Literal
 
 from runtime.agent_runtime_guard import assert_graph_agent_runtime_allowed
 from runtime.control_plane import EventLedger
+from runtime.model_runtime_telemetry import model_runtime_context
 
 ActorKind = Literal["service", "agent", "human"]
 ExecutionStatus = Literal["ready", "running", "waiting_approval", "completed", "failed"]
@@ -157,7 +158,7 @@ class GraphKernel:
 
             if node.actor.kind == "agent":
                 try:
-                    assert_graph_agent_runtime_allowed(node.actor.actor_id)
+                    assert_graph_agent_runtime_allowed(node.actor.actor_id, definition.graph_id)
                 except Exception as exc:
                     return self._fail(execution, f"agent runtime policy blocked {node.node_id}: {exc}")
 
@@ -167,7 +168,17 @@ class GraphKernel:
 
             self._event(execution, "graph.node_started.v1", {"node_id": node.node_id, "actor_id": node.actor.actor_id})
             try:
-                result = handler(deepcopy(execution.state))
+                if node.actor.kind == "agent":
+                    with model_runtime_context(
+                        actor_id=node.actor.actor_id,
+                        execution_id=execution.execution_id,
+                        graph_id=execution.graph_id,
+                        graph_version=execution.graph_version,
+                        node_id=node.node_id,
+                    ):
+                        result = handler(deepcopy(execution.state))
+                else:
+                    result = handler(deepcopy(execution.state))
             except Exception as exc:
                 return self._fail(execution, f"node {node.node_id} failed: {exc}")
 

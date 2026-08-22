@@ -32,10 +32,10 @@ class UnexpectedTool:
 
 class AgentIdentityPolicyTests(unittest.TestCase):
     def test_every_current_worker_has_unique_nonhuman_identity(self):
-        self.assertEqual(42, len(AGENT_IDENTITIES))
+        self.assertEqual(43, len(AGENT_IDENTITIES))
         manifest = identity_manifest()
-        self.assertEqual(42, len({item["identity_id"] for item in manifest}))
-        self.assertEqual(42, len({item["sdk_name"] for item in manifest}))
+        self.assertEqual(43, len({item["identity_id"] for item in manifest}))
+        self.assertEqual(43, len({item["sdk_name"] for item in manifest}))
         self.assertTrue(all(item["authority"] == "A1" for item in manifest))
         self.assertTrue(all(item["secret_access"] is False for item in manifest))
         self.assertTrue(all(item["retry_limit"] == 0 for item in manifest))
@@ -57,25 +57,27 @@ class AgentIdentityPolicyTests(unittest.TestCase):
         )
         self.assertTrue(all(item.work_type == "research_intelligence" for item in AGENT_IDENTITIES.values() if item.allowed_tools))
 
-    def test_outcomes_and_runtime_assurance_agents_are_tool_free(self):
-        for actor_id in (
-            "outcomes-analysis-agent",
-            "outcomes-challenge-agent",
-            "runtime-reliability-agent",
-            "runtime-control-agent",
-        ):
+    def test_outcomes_runtime_and_learning_design_agents_are_tool_free(self):
+        expected_turns = {
+            "outcomes-analysis-agent": 6,
+            "outcomes-challenge-agent": 6,
+            "runtime-reliability-agent": 6,
+            "runtime-control-agent": 6,
+            "learning-design-agent": 8,
+        }
+        for actor_id, turns in expected_turns.items():
             identity = AGENT_IDENTITIES[actor_id]
             self.assertEqual((), identity.allowed_tools)
             self.assertEqual("A1", identity.authority)
-            self.assertEqual(6, identity.max_turns)
+            self.assertEqual(turns, identity.max_turns)
             self.assertEqual(0, identity.retry_limit)
 
     def test_full_graph_and_sdk_identity_audit_passes(self):
         report = audit_agent_identity_policy()
         self.assertTrue(report.passed, report.issues)
         self.assertEqual(41, report.graph_agent_count)
-        self.assertEqual(42, report.registered_identity_count)
-        self.assertEqual(42, report.sdk_agent_count)
+        self.assertEqual(43, report.registered_identity_count)
+        self.assertEqual(43, report.sdk_agent_count)
 
     def test_runtime_guard_allows_registered_tool_free_worker(self):
         agent = FakeTypedAgent("Marketing Agent")

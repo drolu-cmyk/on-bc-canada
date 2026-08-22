@@ -64,6 +64,7 @@ CAREER_DATA = ("deidentified_accepted_capability_metadata", "work_intelligence")
 EMPLOYER_DATA = ("organization_workflow", "aggregate_metrics", "public_research")
 OUTCOMES_DATA = ("aggregate_outcomes", "measurement_metadata")
 RUNTIME_ASSURANCE_DATA = ("aggregate_runtime_telemetry", "runtime_control_state", "telemetry_coverage")
+LEARNING_DESIGN_DATA = ("active_capability_definition", "evidence_standard", "module_summary")
 ORCHESTRATOR_DATA = ("orchestration_metadata",)
 
 
@@ -204,6 +205,7 @@ AGENT_IDENTITIES: dict[str, AgentIdentity] = {
         _identity("outcomes-challenge-agent", "Outcomes Challenge Agent", "outcomes_intelligence", "outcomes-intelligence", "programme outcomes challenge", OUTCOMES_DATA, max_turns=6),
         _identity("runtime-reliability-agent", "Runtime Reliability Agent", "runtime_assurance", "runtime-assurance", "runtime reliability assurance", RUNTIME_ASSURANCE_DATA, max_turns=6),
         _identity("runtime-control-agent", "Runtime Control Agent", "runtime_assurance", "runtime-assurance", "runtime control assurance", RUNTIME_ASSURANCE_DATA, max_turns=6),
+        _identity("learning-design-agent", "Learning Graph Design Agent", "learning_design", None, "learning design", LEARNING_DESIGN_DATA, max_turns=8),
         _identity("platform-orchestrator-agent", "Platform Orchestrator Agent", "platform_orchestration", None, "platform orchestration", ORCHESTRATOR_DATA, max_turns=6, budget_class="low"),
     )
 }
@@ -218,6 +220,7 @@ WORKFLOW_RUNTIME_BUDGETS: dict[str, WorkflowRuntimeBudget] = {
     "employer_workforce": WorkflowRuntimeBudget("employer_workforce", 7, 0, "standard"),
     "outcomes_intelligence": WorkflowRuntimeBudget("outcomes_intelligence", 2, 0, "standard"),
     "runtime_assurance": WorkflowRuntimeBudget("runtime_assurance", 2, 0, "standard"),
+    "learning_design": WorkflowRuntimeBudget("learning_design", 1, 0, "standard"),
     "platform_orchestration": WorkflowRuntimeBudget("platform_orchestration", 1, 0, "low"),
 }
 
@@ -336,6 +339,9 @@ def assert_agent_runtime_allowed(
         raise RuntimeError(
             f"agent model-data policy exceeded for {identity.identity_id}: {', '.join(sorted(declared - allowed))}"
         )
+    from runtime.model_runtime_telemetry import install_model_runtime_telemetry
+
+    install_model_runtime_telemetry()
     return identity
 
 

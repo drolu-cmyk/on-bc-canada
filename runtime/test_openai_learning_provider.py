@@ -14,7 +14,9 @@ from runtime.openai_learning_provider import (
 
 
 class FakeAgent:
-    name = "learning-design-agent"
+    name = "Learning Graph Design Agent"
+    tools = []
+    output_type = object
 
 
 class FakeRunner:

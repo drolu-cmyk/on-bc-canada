@@ -156,6 +156,7 @@ class RuntimeAssuranceSnapshotTests(unittest.TestCase):
         self.assertEqual(1, product["failure_categories"]["evaluation_failure"])
         learner = next(item for item in snapshot["graphs"] if item["graph_id"] == "learner-execution")
         self.assertEqual(1, learner["waiting_approval_count"])
+        self.assertFalse(snapshot["model_runtime"]["path_present"])
         self.assertFalse(snapshot["telemetry_coverage"]["model_token_usage"])
         self.assertFalse(snapshot["telemetry_coverage"]["model_monetary_cost"])
         self.assertFalse(snapshot["telemetry_coverage"]["provider_latency"])
@@ -176,7 +177,7 @@ class RuntimeAssuranceGraphTests(unittest.TestCase):
     @staticmethod
     def _snapshot():
         return {
-            "snapshot_version": "0.1.0",
+            "snapshot_version": "0.2.0",
             "graphs": [
                 {
                     "graph_id": "product-development",
@@ -190,6 +191,7 @@ class RuntimeAssuranceGraphTests(unittest.TestCase):
                 }
             ],
             "source_coverage": [{"store_kind": "generic_graph", "path_present": True, "execution_count": 2}],
+            "model_runtime": {"path_present": False, "reason": "telemetry_store_not_found", "workflows": []},
             "runtime_controls": {"disabled_agent_token_count": 0, "disabled_work_types": []},
             "telemetry_coverage": {
                 "execution_status": True,
@@ -203,11 +205,13 @@ class RuntimeAssuranceGraphTests(unittest.TestCase):
                 "provider_latency": False,
                 "tool_call_latency": False,
                 "trace_sampling": False,
+                "hosted_tool_latency": False,
             },
             "model_boundary": {
                 "contains_learner_identity": False,
                 "contains_raw_graph_state": False,
                 "contains_prompts_or_model_outputs": False,
+                "contains_tool_arguments_or_outputs": False,
                 "contains_credentials": False,
             },
         }
@@ -233,6 +237,17 @@ class RuntimeAssuranceGraphTests(unittest.TestCase):
         snapshot = self._snapshot()
         snapshot["model_boundary"]["contains_raw_graph_state"] = True
         _, execution = graph.start(execution_id="runtime-assurance-002", snapshot=snapshot)
+        self.assertEqual("failed", execution.status)
+        self.assertIn("aggregate telemetry boundary", execution.failure)
+        self.assertEqual([], provider.calls)
+
+    def test_tool_payload_boundary_failure_prevents_agents(self):
+        provider = FakeRuntimeAssuranceProvider()
+        graph = RuntimeAssuranceGraph(GraphKernel(), provider)
+        graph.register()
+        snapshot = self._snapshot()
+        snapshot["model_boundary"]["contains_tool_arguments_or_outputs"] = True
+        _, execution = graph.start(execution_id="runtime-assurance-003", snapshot=snapshot)
         self.assertEqual("failed", execution.status)
         self.assertIn("aggregate telemetry boundary", execution.failure)
         self.assertEqual([], provider.calls)

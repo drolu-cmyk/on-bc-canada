@@ -19,8 +19,8 @@ class AgentIdentityPolicyCliTests(unittest.TestCase):
         self.assertEqual(0, code)
         payload = json.loads(buffer.getvalue())
         self.assertTrue(payload["passed"])
-        self.assertEqual(42, payload["registered_identity_count"])
-        self.assertEqual(42, payload["sdk_agent_count"])
+        self.assertEqual(43, payload["registered_identity_count"])
+        self.assertEqual(43, payload["sdk_agent_count"])
 
     def test_manifest_is_read_only_and_includes_workflow_budgets(self):
         buffer = io.StringIO()
@@ -28,8 +28,8 @@ class AgentIdentityPolicyCliTests(unittest.TestCase):
             code = main(["manifest"])
         self.assertEqual(0, code)
         payload = json.loads(buffer.getvalue())
-        self.assertEqual(42, len(payload["identities"]))
-        self.assertEqual(9, len(payload["workflow_budgets"]))
+        self.assertEqual(43, len(payload["identities"]))
+        self.assertEqual(10, len(payload["workflow_budgets"]))
         self.assertIn("read-only", payload["write_controls"])
 
     def test_status_reports_runtime_disable(self):

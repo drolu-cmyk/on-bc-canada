@@ -7,6 +7,7 @@ requires every registered platform graph agent to have an identity before merge.
 from __future__ import annotations
 
 from runtime.agent_identity_registry import AGENT_IDENTITIES, effective_turn_limit, is_identity_enabled
+from runtime.model_runtime_telemetry import install_model_runtime_telemetry
 
 
 def assert_graph_agent_runtime_allowed(actor_id: str, graph_id: str | None = None):
@@ -35,4 +36,5 @@ def assert_graph_agent_runtime_allowed(actor_id: str, graph_id: str | None = Non
             f"runtime turn cap is below the provider contract for {identity.identity_id}: "
             f"effective={effective} provider={identity.max_turns}"
         )
+    install_model_runtime_telemetry()
     return identity

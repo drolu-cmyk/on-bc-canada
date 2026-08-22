@@ -10,6 +10,7 @@ import uuid
 from pathlib import Path
 
 from runtime.graph_execution_store import GraphExecutionStore
+from runtime.model_runtime_telemetry import telemetry_db_path
 from runtime.openai_runtime_assurance_provider import OpenAIRuntimeAssuranceProvider
 from runtime.runtime_assurance import RuntimeAssuranceSnapshotBuilder, RuntimeStoreSource
 from runtime.runtime_assurance_runner import runtime_assurance_summary, start_runtime_assurance
@@ -17,12 +18,14 @@ from runtime.runtime_assurance_runner import runtime_assurance_summary, start_ru
 
 DEFAULT_EXECUTION_DB = Path(os.getenv("SOZOROCK_GRAPH_DB", "local-data/graph-executions.sqlite3"))
 DEFAULT_RESEARCH_DB = Path(os.getenv("SOZOROCK_RESEARCH_DB", "local-data/research.sqlite3"))
+DEFAULT_TELEMETRY_DB = telemetry_db_path()
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run aggregate Runtime Assurance.")
     parser.add_argument("--execution-db", default=str(DEFAULT_EXECUTION_DB))
     parser.add_argument("--research-db", default=str(DEFAULT_RESEARCH_DB))
+    parser.add_argument("--telemetry-db", default=str(DEFAULT_TELEMETRY_DB))
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     start = subparsers.add_parser("start", help="Build aggregate runtime telemetry and analyze it.")
@@ -48,7 +51,8 @@ def main(argv: list[str] | None = None) -> int:
                 (
                     RuntimeStoreSource(args.execution_db, "generic_graph"),
                     RuntimeStoreSource(args.research_db, "research"),
-                )
+                ),
+                model_telemetry_path=args.telemetry_db,
             ).build()
             execution = start_runtime_assurance(
                 provider=_provider(),
