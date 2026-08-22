@@ -128,8 +128,10 @@ def validate_template() -> list[str]:
         errors.append("CloudFront custom-domain TLS must use SNI")
     if viewer_certificate.get("MinimumProtocolVersion") != "TLSv1.2_2021":
         errors.append("CloudFront custom-domain TLS must require TLS 1.2")
-    if distribution_config.get("IsIPV6Enabled") is not True:
-        errors.append("CloudFront IPv6 must be enabled")
+    if distribution_config.get("IPV6Enabled") is not True:
+        errors.append("CloudFront IPv6 must be enabled with IPV6Enabled")
+    if "IsIPV6Enabled" in distribution_config:
+        errors.append("CloudFront DistributionConfig must not use unsupported IsIPV6Enabled")
     if distribution_config.get("DefaultRootObject") != "index.html":
         errors.append("CloudFront default root object must be index.html")
 
