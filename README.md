@@ -42,6 +42,7 @@ The program publishes only claims supported by current records. Participation is
 - [Canadian technical-work research graph](docs/research-graph.md)
 - [Work Intelligence Graph](docs/work-intelligence-graph.md)
 - [Learner Capability Graph](docs/capability-graph.md)
+- [Learning Graph](docs/learning-graph.md)
 - [Specialization curriculum](docs/specialization-curriculum.md)
 - [Automation capabilities](docs/automation-capabilities.md)
 - [Learner operations](docs/learner-operations.md)
