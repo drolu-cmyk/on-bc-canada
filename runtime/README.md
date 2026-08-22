@@ -27,7 +27,15 @@ The graph kernel does not call a model by itself. Agent providers are injected t
 
 `openai_research_provider.py` supplies the first live reasoning workers using the OpenAI Agents SDK. Workers use typed Pydantic outputs. Only source discovery, evidence verification, technology verification, and contradiction review receive hosted web-search access. Confidence scoring remains deterministic code.
 
-Install the optional agent runtime dependencies before live use:
+## Durable research state
+
+`research_store.py` persists one graph execution to SQLite, including state, checkpoints, human-review state, failure state, and the hash-chained event ledger. This is workflow memory, not semantic learner memory. It allows a process to stop at a human gate and resume later without rerunning completed research nodes.
+
+The default local database is `local-data/research.sqlite3`. `local-data/` is ignored by Git and is not a production data store.
+
+`research_runner.py` supplies testable start and resume helpers. `run_research.py` is the command interface.
+
+Install the agent runtime dependencies before live use:
 
 ```bash
 python -m pip install -r runtime/requirements-agentic.txt
@@ -35,10 +43,33 @@ python -m pip install -r runtime/requirements-agentic.txt
 
 A live run additionally requires `OPENAI_API_KEY`. Secrets do not belong in the repository.
 
+Start research:
+
+```bash
+python -m runtime.run_research start \
+  --question "What capabilities are Canadian employers asking Applied AI practitioners to demonstrate?"
+```
+
+If the graph reaches the curriculum gate, the command returns the execution ID and approval state. Review the stored evidence, then resume with an accountable human decision:
+
+```bash
+python -m runtime.run_research resume \
+  --execution-id <execution-id> \
+  --approve \
+  --approver-id <approved-operator-id> \
+  --note "Approved for programme review."
+```
+
+Use `--deny` instead of `--approve` when the evidence should not proceed. Read stored status without a model call:
+
+```bash
+python -m runtime.run_research status --execution-id <execution-id>
+```
+
 Run the tests from the repository root:
 
 ```bash
 python -m unittest discover -s runtime -p 'test_*.py' -v
 ```
 
-The test suite does not make live model calls. It checks the provider contracts with deterministic fixtures and constructs the installed SDK agents to catch integration drift.
+The test suite does not make live model calls. It checks graph execution, persistence, stop-and-resume behavior, provider contracts, command boundaries, and installed SDK construction.
