@@ -23,7 +23,7 @@ The graph kernel does not call a model by itself. Agent providers are injected t
 
 ## Research graph
 
-`research_graph.py` is the first production-shaped workflow. It moves a Canadian technical-work research question through Research Director discovery, Evidence verification, labour-market analysis, technology analysis, capability extraction, contradiction review, deterministic evidence scoring, and curriculum-impact analysis. A proposed pathway change stops at a human curriculum gate.
+`research_graph.py` is the first production-shaped workflow. It moves a Canadian technical-work research question through Research Director discovery, Evidence verification, labour-market analysis, technology analysis, capability extraction, contradiction review, deterministic evidence scoring, and curriculum-impact analysis. A recommended pathway change stops at a human curriculum gate.
 
 `openai_research_provider.py` supplies the first live reasoning workers using the OpenAI Agents SDK. Workers use typed Pydantic outputs. Only source discovery, evidence verification, technology verification, and contradiction review receive hosted web-search access. Confidence scoring remains deterministic code.
 
