@@ -80,7 +80,7 @@ replace_dns_with_api_gateway() {
     exit 1
   fi
 
-  deletes="$(jq -c '[.[] | {Action:"DELETE",ResourceRecordSet:.}]' <<<"${records}")"
+  deletes="$(jq -c '[.[] | select(.Type == "CNAME") | {Action:"DELETE",ResourceRecordSet:.}]' <<<"${records}")"
   change_batch="$(jq -cn \
     --arg name "${record_name}." \
     --arg dns "${target_domain%.}." \
