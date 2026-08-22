@@ -88,6 +88,7 @@ class OutcomesSnapshotBuilder:
                 "minimum_binary_cell": self.policy.minimum_binary_cell,
                 "cohort_level_release": False,
                 "individual_level_release": False,
+                "secondary_cells_use_suppression": True,
             },
             "groups": released,
             "suppressed_group_count": len(suppressed),
@@ -164,6 +165,7 @@ class OutcomesSnapshotBuilder:
             JOIN learner_path_instances i ON i.instance_id = p.instance_id
             WHERE i.pathway_id = ? AND i.learning_version = ?
             GROUP BY p.kind, p.status
+            ORDER BY p.kind, p.status
             """,
             params,
         ).fetchall()
@@ -188,23 +190,46 @@ class OutcomesSnapshotBuilder:
             else:
                 suppressed_capability_count += 1
 
+        submitting_learners = int(submissions["submitting_learners"] or 0)
+        submission_participation = self.policy.release_binary_rate(submitting_learners, learner_count)
+        submission_count = int(submissions["submissions"] or 0)
+        accepted_submissions = int(submissions["accepted_submissions"] or 0)
+        if submission_participation["status"] == "released":
+            submission_summary: dict[str, Any] = {
+                "status": "released",
+                "learner_participation": submission_participation,
+                "submission_count": submission_count,
+                "accepted_submission_rate": self.policy.release_binary_rate(accepted_submissions, submission_count),
+                "average_attempt_number": round(float(submissions["average_attempt_number"]), 2)
+                if submissions["average_attempt_number"] is not None
+                else None,
+            }
+        else:
+            submission_summary = {
+                "status": "suppressed",
+                "reason": submission_participation["reason"],
+            }
+
+        kind_totals: dict[str, int] = {}
+        for row in unit_counts:
+            kind_totals[row["kind"]] = kind_totals.get(row["kind"], 0) + int(row["value"])
+        released_unit_statuses: list[dict[str, Any]] = []
+        suppressed_unit_status_count = 0
+        for row in unit_counts:
+            released = self.policy.release_binary_rate(int(row["value"]), kind_totals[row["kind"]])
+            if released["status"] == "released":
+                released_unit_statuses.append({"kind": row["kind"], "status": row["status"], **released})
+            else:
+                suppressed_unit_status_count += 1
+
         return {
             **base,
             "privacy_status": "released",
             "completion": self.policy.release_binary_rate(completed, learner_count),
             "learners_with_accepted_capability_evidence": self.policy.release_binary_rate(with_evidence, learner_count),
-            "submission_summary": {
-                "submission_count": int(submissions["submissions"] or 0),
-                "submitting_learner_count": int(submissions["submitting_learners"] or 0),
-                "accepted_submission_count": int(submissions["accepted_submissions"] or 0),
-                "average_attempt_number": round(float(submissions["average_attempt_number"]), 2)
-                if submissions["average_attempt_number"] is not None
-                else None,
-            },
-            "unit_status_counts": [
-                {"kind": row["kind"], "status": row["status"], "count": int(row["value"])}
-                for row in unit_counts
-            ],
+            "submission_summary": submission_summary,
+            "unit_status_rates": released_unit_statuses,
+            "suppressed_unit_status_metric_count": suppressed_unit_status_count,
             "capability_evidence_rates": capability_metrics,
             "suppressed_capability_metric_count": suppressed_capability_count,
         }
