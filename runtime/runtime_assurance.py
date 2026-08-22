@@ -44,13 +44,21 @@ class RuntimeAssuranceSnapshotBuilder:
             for row in rows:
                 self._accumulate(graph_metrics, row)
 
-        graphs = []
+        graphs: list[dict[str, Any]] = []
         for graph_id in sorted(graph_metrics):
             metric = graph_metrics[graph_id]
             executions = metric["execution_count"]
             graphs.append(
                 {
-                    **metric,
+                    "graph_id": graph_id,
+                    "versions": sorted(metric["versions"]),
+                    "execution_count": executions,
+                    "completed_count": metric["completed_count"],
+                    "failed_count": metric["failed_count"],
+                    "waiting_approval_count": metric["waiting_approval_count"],
+                    "completed_node_count": metric["completed_node_count"],
+                    "event_count": metric["event_count"],
+                    "failure_categories": dict(sorted(metric["failure_categories"].items())),
                     "completion_rate": round(metric["completed_count"] / executions, 4) if executions else None,
                     "failure_rate": round(metric["failed_count"] / executions, 4) if executions else None,
                     "human_review_rate": round(metric["waiting_approval_count"] / executions, 4) if executions else None,
@@ -136,7 +144,6 @@ class RuntimeAssuranceSnapshotBuilder:
         metric = graph_metrics.setdefault(
             graph_id,
             {
-                "graph_id": graph_id,
                 "versions": set(),
                 "execution_count": 0,
                 "completed_count": 0,
@@ -164,19 +171,3 @@ class RuntimeAssuranceSnapshotBuilder:
         category = cls._failure_category(row.get("failure"))
         if category:
             metric["failure_categories"][category] = metric["failure_categories"].get(category, 0) + 1
-
-        # Convert mutable audit-only structures to JSON-safe forms in place.
-        metric["versions"] = set(metric["versions"])
-
-
-def finalize_runtime_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
-    """Normalize set values after aggregation for JSON-safe graph/model input."""
-    normalized = dict(snapshot)
-    graphs = []
-    for graph in snapshot.get("graphs", []):
-        item = dict(graph)
-        versions = item.get("versions", [])
-        item["versions"] = sorted(versions) if isinstance(versions, set) else sorted(set(versions))
-        graphs.append(item)
-    normalized["graphs"] = graphs
-    return normalized
