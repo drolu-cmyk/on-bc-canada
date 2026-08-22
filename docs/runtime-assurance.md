@@ -6,13 +6,19 @@ It is an assurance workflow, not a self-healing superuser. The graph can identif
 
 ## Evidence boundary
 
-The workflow reads aggregate fields from three local reference stores when they exist:
+The workflow reads aggregate fields from the durable execution stores plus one bounded model-runtime source.
+
+Execution evidence can include:
 
 - generic GraphExecutionStore records
 - ResearchStore execution records
-- the model runtime telemetry store
 
-The deterministic snapshot builder extracts operational evidence such as:
+Model-runtime evidence can come from either:
+
+- local privacy-safe telemetry SQLite
+- centralized KMS-encrypted CloudWatch trace summaries
+
+The deterministic snapshot contains operational evidence such as:
 
 - graph ID and observed versions
 - execution count
@@ -26,7 +32,7 @@ The deterministic snapshot builder extracts operational evidence such as:
 - input, output, total, cached-input, and reasoning token counts
 - aggregate model-run and generation latency
 - local function or MCP tool-span latency when those spans exist
-- optional estimated model cost when a reviewed pricing table is configured
+- optional estimated model cost when reviewed pricing is configured
 
 It does not pass raw graph state, checkpoints, prompts, model outputs, tool arguments, tool outputs, credentials, learner identity, or raw approval records to the Runtime Assurance agents.
 
@@ -51,9 +57,11 @@ The telemetry processor records operational facts only. It does not copy SDK tra
 
 ```text
 OPENAI_AGENTS_TRACE_INCLUDE_SENSITIVE_DATA=0
+OPENAI_AGENTS_DONT_LOG_MODEL_DATA=1
+OPENAI_AGENTS_DONT_LOG_TOOL_DATA=1
 ```
 
-before governed live model work so prompt, output, and tool payload bodies are excluded from SDK tracing.
+before governed live model work.
 
 The default local reference database is:
 
@@ -61,7 +69,29 @@ The default local reference database is:
 local-data/model-telemetry.sqlite3
 ```
 
-`local-data/` is ignored by Git and is not the production persistence design.
+## AWS production source
+
+`runtime/aws_runtime_observability.py` supplies the centralized production path.
+
+One strict trace summary is written to the KMS-encrypted CloudWatch log group after a governed model trace completes. The direct execution ID remains local; the centralized record contains only its one-way fingerprint.
+
+Runtime Assurance reads CloudWatch through Logs Insights, requests only approved trace-summary fields, sorts newest first, deduplicates by trace ID, and performs final aggregation in deterministic Python code.
+
+Select centralized telemetry with:
+
+```bash
+python -m runtime.run_runtime_assurance \
+  --telemetry-source aws \
+  start
+```
+
+The default query window is 1,440 minutes and can be changed with:
+
+```text
+SOZOROCK_AWS_ASSURANCE_LOOKBACK_MINUTES
+```
+
+AWS source details, IAM controls, retention and deployment authority are documented in [AWS Runtime Observability](aws-runtime-observability.md).
 
 ## Telemetry coverage
 
@@ -82,7 +112,7 @@ generation latency
 local function/MCP tool-span latency
 ```
 
-Coverage remains explicit. A missing telemetry database or an empty telemetry database does not become evidence of healthy operation.
+Coverage remains explicit. A missing local database, missing centralized log group, empty result window, or unavailable query does not become evidence of healthy operation.
 
 Provider-hosted tool latency is still reported as unavailable separately. The current Research workers use OpenAI-hosted web search, and this implementation does not infer a standalone web-search duration when the SDK does not expose one as a local tool span.
 
@@ -157,21 +187,26 @@ Product Development retains its existing A3 release-authorization boundary. Runt
 
 ## Durable operation
 
-Run assurance over the current execution, research, and model telemetry stores:
-
-```bash
-python -m runtime.run_runtime_assurance start
-```
-
-A custom telemetry store may be selected with:
+Run assurance with local model telemetry:
 
 ```bash
 python -m runtime.run_runtime_assurance \
+  --telemetry-source local \
+  start
+```
+
+A custom local telemetry store may be selected with:
+
+```bash
+python -m runtime.run_runtime_assurance \
+  --telemetry-source local \
   --telemetry-db local-data/model-telemetry.sqlite3 \
   start
 ```
 
-Live model work requires `OPENAI_API_KEY`.
+When `SOZOROCK_AWS_OBSERVABILITY_ENABLED=1`, the command defaults to the AWS telemetry source. The source can still be selected explicitly with `--telemetry-source`.
+
+Live Runtime Assurance model work requires `OPENAI_API_KEY`.
 
 Read a stored result without a model call:
 

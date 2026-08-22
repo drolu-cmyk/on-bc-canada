@@ -1,0 +1,289 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Privacy-bounded CloudWatch observability for SozoRock Canada autonomous runtime telemetry.",
+  "Parameters": {
+    "EnvironmentName": {
+      "Type": "String",
+      "Default": "pilot",
+      "AllowedPattern": "^[a-z0-9-]{2,32}$"
+    },
+    "TelemetryLogGroupName": {
+      "Type": "String",
+      "Default": "/sozorock/canada/runtime/model-telemetry"
+    },
+    "TelemetryLogStreamName": {
+      "Type": "String",
+      "Default": "model-runtime"
+    },
+    "RetentionDays": {
+      "Type": "Number",
+      "Default": 30,
+      "AllowedValues": [7, 14, 30, 60, 90, 120, 150, 180, 365]
+    },
+    "AlarmEmail": {
+      "Type": "String",
+      "Default": ""
+    },
+    "DailyTokenThreshold": {
+      "Type": "Number",
+      "Default": 1000000,
+      "MinValue": 1
+    },
+    "DailyEstimatedCostThresholdUSD": {
+      "Type": "Number",
+      "Default": 5,
+      "MinValue": 0.01
+    },
+    "AverageRunLatencyThresholdMs": {
+      "Type": "Number",
+      "Default": 30000,
+      "MinValue": 1000
+    }
+  },
+  "Conditions": {
+    "AlarmNotificationsEnabled": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {"Ref": "AlarmEmail"},
+            ""
+          ]
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "RuntimeTelemetryKey": {
+      "Type": "AWS::KMS::Key",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "Description": "Encrypt SozoRock Canada runtime telemetry retained in CloudWatch Logs.",
+        "EnableKeyRotation": true,
+        "KeyPolicy": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "EnableAccountAdministration",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
+                }
+              },
+              "Action": "kms:*",
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowCloudWatchLogsForTelemetryGroup",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": {
+                  "Fn::Sub": "logs.${AWS::Region}.amazonaws.com"
+                }
+              },
+              "Action": [
+                "kms:Encrypt*",
+                "kms:Decrypt*",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+                "kms:Describe*"
+              ],
+              "Resource": "*",
+              "Condition": {
+                "ArnEquals": {
+                  "kms:EncryptionContext:aws:logs:arn": {
+                    "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${TelemetryLogGroupName}"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "Tags": [
+          {"Key": "Project", "Value": "SozoRockCanada"},
+          {"Key": "DataClass", "Value": "privacy-safe-runtime-telemetry"}
+        ]
+      }
+    },
+    "RuntimeTelemetryKeyAlias": {
+      "Type": "AWS::KMS::Alias",
+      "Properties": {
+        "AliasName": {"Fn::Sub": "alias/sozorock-canada-${EnvironmentName}-runtime-telemetry"},
+        "TargetKeyId": {"Ref": "RuntimeTelemetryKey"}
+      }
+    },
+    "RuntimeTelemetryLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "LogGroupName": {"Ref": "TelemetryLogGroupName"},
+        "RetentionInDays": {"Ref": "RetentionDays"},
+        "KmsKeyId": {"Fn::GetAtt": ["RuntimeTelemetryKey", "Arn"]},
+        "Tags": [
+          {"Key": "Project", "Value": "SozoRockCanada"},
+          {"Key": "Environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "DataClass", "Value": "privacy-safe-runtime-telemetry"}
+        ]
+      }
+    },
+    "RuntimeTelemetryLogStream": {
+      "Type": "AWS::Logs::LogStream",
+      "Properties": {
+        "LogGroupName": {"Ref": "RuntimeTelemetryLogGroup"},
+        "LogStreamName": {"Ref": "TelemetryLogStreamName"}
+      }
+    },
+    "RuntimeTelemetryPublisherPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "Description": "Permit a platform runtime to append only privacy-safe telemetry to the precreated CloudWatch Logs stream.",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AppendRuntimeTelemetry",
+              "Effect": "Allow",
+              "Action": "logs:PutLogEvents",
+              "Resource": {
+                "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${TelemetryLogGroupName}:log-stream:${TelemetryLogStreamName}"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "RuntimeAssuranceReaderPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "Description": "Permit Runtime Assurance to query only the centralized privacy-safe telemetry log group.",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "StartTelemetryQuery",
+              "Effect": "Allow",
+              "Action": "logs:StartQuery",
+              "Resource": {
+                "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${TelemetryLogGroupName}:*"
+              }
+            },
+            {
+              "Sid": "ReadTelemetryQueryResults",
+              "Effect": "Allow",
+              "Action": ["logs:GetQueryResults", "logs:StopQuery"],
+              "Resource": "*"
+            }
+          ]
+        }
+      }
+    },
+    "RuntimeAlarmTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "DisplayName": "SozoRock Canada Runtime Assurance",
+        "KmsMasterKeyId": "alias/aws/sns",
+        "Tags": [
+          {"Key": "Project", "Value": "SozoRockCanada"},
+          {"Key": "Environment", "Value": {"Ref": "EnvironmentName"}}
+        ]
+      }
+    },
+    "RuntimeAlarmSubscription": {
+      "Type": "AWS::SNS::Subscription",
+      "Condition": "AlarmNotificationsEnabled",
+      "Properties": {
+        "Protocol": "email",
+        "Endpoint": {"Ref": "AlarmEmail"},
+        "TopicArn": {"Ref": "RuntimeAlarmTopic"}
+      }
+    },
+    "RuntimeModelErrorAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "At least one governed model runtime trace reported an error span in five minutes.",
+        "Namespace": "SozoRock/CanadaPlatform",
+        "MetricName": "ModelErrorCount",
+        "Dimensions": [{"Name": "Environment", "Value": {"Ref": "EnvironmentName"}}],
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "DatapointsToAlarm": 1,
+        "Threshold": 1,
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": {"Fn::If": ["AlarmNotificationsEnabled", [{"Ref": "RuntimeAlarmTopic"}], {"Ref": "AWS::NoValue"}]}
+      }
+    },
+    "RuntimeDailyTokenAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "Daily governed model-token volume exceeded the pilot threshold.",
+        "Namespace": "SozoRock/CanadaPlatform",
+        "MetricName": "TotalTokens",
+        "Dimensions": [{"Name": "Environment", "Value": {"Ref": "EnvironmentName"}}],
+        "Statistic": "Sum",
+        "Period": 86400,
+        "EvaluationPeriods": 1,
+        "DatapointsToAlarm": 1,
+        "Threshold": {"Ref": "DailyTokenThreshold"},
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": {"Fn::If": ["AlarmNotificationsEnabled", [{"Ref": "RuntimeAlarmTopic"}], {"Ref": "AWS::NoValue"}]}
+      }
+    },
+    "RuntimeDailyEstimatedCostAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "Daily estimated governed model cost exceeded the configured threshold; this metric exists only when reviewed pricing is configured.",
+        "Namespace": "SozoRock/CanadaPlatform",
+        "MetricName": "EstimatedModelCostUSD",
+        "Dimensions": [{"Name": "Environment", "Value": {"Ref": "EnvironmentName"}}],
+        "Statistic": "Sum",
+        "Period": 86400,
+        "EvaluationPeriods": 1,
+        "DatapointsToAlarm": 1,
+        "Threshold": {"Ref": "DailyEstimatedCostThresholdUSD"},
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": {"Fn::If": ["AlarmNotificationsEnabled", [{"Ref": "RuntimeAlarmTopic"}], {"Ref": "AWS::NoValue"}]}
+      }
+    },
+    "RuntimeLatencyAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "Average governed model-run latency exceeded the configured five-minute threshold.",
+        "Namespace": "SozoRock/CanadaPlatform",
+        "MetricName": "RunLatencyMs",
+        "Dimensions": [{"Name": "Environment", "Value": {"Ref": "EnvironmentName"}}],
+        "Statistic": "Average",
+        "Period": 300,
+        "EvaluationPeriods": 2,
+        "DatapointsToAlarm": 2,
+        "Threshold": {"Ref": "AverageRunLatencyThresholdMs"},
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": {"Fn::If": ["AlarmNotificationsEnabled", [{"Ref": "RuntimeAlarmTopic"}], {"Ref": "AWS::NoValue"}]}
+      }
+    },
+    "RuntimeObservabilityDashboard": {
+      "Type": "AWS::CloudWatch::Dashboard",
+      "Properties": {
+        "DashboardName": {"Fn::Sub": "SozoRock-Canada-${EnvironmentName}-Runtime"},
+        "DashboardBody": {
+          "Fn::Sub": "{\"widgets\":[{\"type\":\"metric\",\"x\":0,\"y\":0,\"width\":12,\"height\":6,\"properties\":{\"title\":\"Model runs and errors\",\"region\":\"${AWS::Region}\",\"view\":\"timeSeries\",\"metrics\":[[\"SozoRock/CanadaPlatform\",\"ModelRunCount\",\"Environment\",\"${EnvironmentName}\",{\"stat\":\"Sum\"}],[\".\",\"ModelErrorCount\",\".\",\".\",{\"stat\":\"Sum\"}]]}},{\"type\":\"metric\",\"x\":12,\"y\":0,\"width\":12,\"height\":6,\"properties\":{\"title\":\"Token volume\",\"region\":\"${AWS::Region}\",\"view\":\"timeSeries\",\"metrics\":[[\"SozoRock/CanadaPlatform\",\"TotalTokens\",\"Environment\",\"${EnvironmentName}\",{\"stat\":\"Sum\"}],[\".\",\"CachedInputTokens\",\".\",\".\",{\"stat\":\"Sum\"}],[\".\",\"ReasoningTokens\",\".\",\".\",{\"stat\":\"Sum\"}]]}},{\"type\":\"metric\",\"x\":0,\"y\":6,\"width\":12,\"height\":6,\"properties\":{\"title\":\"Run latency\",\"region\":\"${AWS::Region}\",\"view\":\"timeSeries\",\"metrics\":[[\"SozoRock/CanadaPlatform\",\"RunLatencyMs\",\"Environment\",\"${EnvironmentName}\",{\"stat\":\"Average\"}],[\".\",\"GenerationLatencyMs\",\".\",\".\",{\"stat\":\"Average\"}]]}},{\"type\":\"metric\",\"x\":12,\"y\":6,\"width\":12,\"height\":6,\"properties\":{\"title\":\"Estimated model cost\",\"region\":\"${AWS::Region}\",\"view\":\"timeSeries\",\"metrics\":[[\"SozoRock/CanadaPlatform\",\"EstimatedModelCostUSD\",\"Environment\",\"${EnvironmentName}\",{\"stat\":\"Sum\"}]]}}]}"
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "TelemetryKmsKeyArn": {"Value": {"Fn::GetAtt": ["RuntimeTelemetryKey", "Arn"]}},
+    "TelemetryLogGroupName": {"Value": {"Ref": "RuntimeTelemetryLogGroup"}},
+    "TelemetryLogStreamName": {"Value": {"Ref": "TelemetryLogStream"}},
+    "PublisherPolicyArn": {"Value": {"Ref": "RuntimeTelemetryPublisherPolicy"}},
+    "RuntimeAssuranceReaderPolicyArn": {"Value": {"Ref": "RuntimeAssuranceReaderPolicy"}},
+    "AlarmTopicArn": {"Value": {"Ref": "RuntimeAlarmTopic"}},
+    "DashboardName": {"Value": {"Ref": "RuntimeObservabilityDashboard"}}
+  }
+}

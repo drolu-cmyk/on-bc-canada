@@ -6,8 +6,15 @@ on:
     paths:
       - ".github/workflows/public-site-deploy.yml"
       - "config/deployment.yaml"
-      - "infra/**"
-      - "scripts/**"
+      - "infra/public-site.template.json"
+      - "infra/engagement-backend.template.json"
+      - "infra/legacy-ca-redirect.template.json"
+      - "scripts/deploy_public_site.sh"
+      - "scripts/deploy_engagement_backend.sh"
+      - "scripts/deploy_legacy_ca_redirects.sh"
+      - "scripts/preflight_cloudfront_function.sh"
+      - "scripts/validate_deployment.py"
+      - "scripts/validate_legacy_redirect.py"
       - "site/**"
       - "schemas/**"
   pull_request:
@@ -15,8 +22,15 @@ on:
     paths:
       - ".github/workflows/public-site-deploy.yml"
       - "config/deployment.yaml"
-      - "infra/**"
-      - "scripts/**"
+      - "infra/public-site.template.json"
+      - "infra/engagement-backend.template.json"
+      - "infra/legacy-ca-redirect.template.json"
+      - "scripts/deploy_public_site.sh"
+      - "scripts/deploy_engagement_backend.sh"
+      - "scripts/deploy_legacy_ca_redirects.sh"
+      - "scripts/preflight_cloudfront_function.sh"
+      - "scripts/validate_deployment.py"
+      - "scripts/validate_legacy_redirect.py"
       - "site/**"
       - "schemas/**"
   workflow_dispatch:
@@ -36,13 +50,40 @@ env:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    outputs:
+      public_deploy_changed: ${{ steps.public_changes.outputs.public_deploy_changed }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: public_changes
+        name: Detect public deployment changes
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "public_deploy_changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "${{ github.event_name }}" != "push" ]]; then
+            echo "public_deploy_changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          base="${{ github.event.before }}"
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+            echo "public_deploy_changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git diff --name-only "$base" "${{ github.sha }}" > /tmp/public-site-changes.txt
+          if grep -Eq '^(config/deployment\.yaml|infra/(public-site\.template\.json|engagement-backend\.template\.json|legacy-ca-redirect\.template\.json)|scripts/(deploy_public_site\.sh|deploy_engagement_backend\.sh|deploy_legacy_ca_redirects\.sh|preflight_cloudfront_function\.sh|validate_deployment\.py|validate_legacy_redirect\.py)|site/|schemas/)' /tmp/public-site-changes.txt; then
+            echo "public_deploy_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "public_deploy_changed=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install validators
-        run: python -m pip install --disable-pip-version-check pyyaml jsonschema
+      - name: Install validators and agent runtime
+        run: python -m pip install --disable-pip-version-check pyyaml jsonschema -r runtime/requirements-agentic.txt
       - name: Validate specifications
         run: python scripts/validate_specs.py
       - name: Validate public copy
@@ -65,7 +106,7 @@ jobs:
           bash -n scripts/preflight_cloudfront_function.sh
 
   deploy:
-    if: github.ref == 'refs/heads/main' && vars.PUBLIC_SITE_DEPLOYMENT_ENABLED == 'true' && vars.CANADA_DOMAIN_MIGRATION_ENABLED == 'true'
+    if: github.ref == 'refs/heads/main' && vars.PUBLIC_SITE_DEPLOYMENT_ENABLED == 'true' && vars.CANADA_DOMAIN_MIGRATION_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || needs.validate.outputs.public_deploy_changed == 'true')
     needs: validate
     runs-on: ubuntu-latest
     permissions:
