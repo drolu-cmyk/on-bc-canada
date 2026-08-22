@@ -309,18 +309,24 @@ distribution_has_alias() {
     'tolower($0) == tolower(domain) {found = 1} END {exit(found ? 0 : 1)}'
 }
 
+cloudfront_proof_record() {
+  local domain_name="$1"
+  if [[ "${domain_name}" == "${LEGACY_ROOT_DOMAIN}" ]]; then
+    printf '_.%s.\n' "${domain_name}"
+  else
+    printf '_%s.\n' "${domain_name}"
+  fi
+}
+
 transfer_domain_associations() {
   local target_distribution_id="$1"
   local target_distribution_domain="$2"
   local domain_name
   local conflicts
   local conflict_count
+  local proof_record
   local target_etag
   local transfer_output
-
-  for domain_name in "${PUBLIC_DOMAINS[@]}"; do
-    upsert_txt "_${domain_name}." "\"${target_distribution_domain%.}\""
-  done
 
   for domain_name in "${PUBLIC_DOMAINS[@]}"; do
     if distribution_has_alias "${target_distribution_id}" "${domain_name}"; then
@@ -337,6 +343,16 @@ transfer_domain_associations() {
       echo "No existing CloudFront association was reported for ${domain_name}; the target distribution will attach it."
       continue
     fi
+
+    if [[ "${domain_name}" == "${CANONICAL_DOMAIN}" ]]; then
+      echo "CloudFront reports an existing association for ${domain_name}." >&2
+      echo "Its cross-account proof record _${domain_name}. belongs to the authoritative sozorock.com parent zone, not the delegated Canada zone." >&2
+      echo "Resolve that conflict in the parent .com account before retrying this deployment." >&2
+      exit 1
+    fi
+
+    proof_record="$(cloudfront_proof_record "${domain_name}")"
+    upsert_txt "${proof_record}" "\"${target_distribution_domain%.}\""
 
     target_etag="$(aws cloudfront get-distribution-config \
       --id "${target_distribution_id}" \
