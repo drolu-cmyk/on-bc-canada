@@ -31,8 +31,8 @@
       "Properties": {
         "Name":{"Fn::Sub":"${AWS::StackName}-canonical-routes"},
         "AutoPublish":true,
-        "FunctionConfig":{"Comment":"Redirect legacy HTML URLs and resolve clean static routes.","Runtime":"cloudfront-js-2.0"},
-        "FunctionCode":"function handler(event) { var request = event.request; var uri = request.uri; function redirect(value) { return { statusCode: 301, statusDescription: 'Moved Permanently', headers: { location: { value: value }, 'cache-control': { value: 'public, max-age=86400' } } }; } if (uri === '/index.html') { return redirect('/'); } if (uri === '/program' || uri === '/program.html') { return redirect('/programs'); } if (uri.length > 5 && uri.slice(-5) === '.html') { return redirect(uri.slice(0, -5) || '/'); } var last = uri.split('/').pop(); if (uri !== '/' && last && last.indexOf('.') === -1) { request.uri = uri + '.html'; } return request; }"
+        "FunctionConfig":{"Comment":"Redirect retired or legacy URLs and resolve clean static routes.","Runtime":"cloudfront-js-2.0"},
+        "FunctionCode":"function handler(event) { var request = event.request; var uri = request.uri; function redirect(value) { return { statusCode: 301, statusDescription: 'Moved Permanently', headers: { location: { value: value }, 'cache-control': { value: 'public, max-age=86400' } } }; } if (uri === '/index.html') { return redirect('/'); } if (uri === '/program' || uri === '/program.html') { return redirect('/programs'); } if (uri === '/stories' || uri === '/stories.html') { return redirect('/impact'); } if (uri.length > 5 && uri.slice(-5) === '.html') { return redirect(uri.slice(0, -5) || '/'); } var last = uri.split('/').pop(); if (uri !== '/' && last && last.indexOf('.') === -1) { request.uri = uri + '.html'; } return request; }"
       }
     },
     "PublicSiteDistribution": {
