@@ -93,8 +93,8 @@ class ResearchDomainPackTests(unittest.TestCase):
         self.assertEqual("applied-ai-systems", research["domain"]["domain_id"])
         self.assertEqual("Applied AI Systems", research["domain"]["pathway_name"])
         self.assertIn("graph engineering and conditional orchestration", research["domain"]["capability_focus"])
-        self.assertIn("research.domain", runner.calls[0][1])
-        self.assertIn("applied-ai-systems", runner.calls[0][1])
+        self.assertIn('"domain_id": "applied-ai-systems"', runner.calls[0][1])
+        self.assertIn('"pathway_name": "Applied AI Systems"', runner.calls[0][1])
 
 
 if __name__ == "__main__":
