@@ -8,13 +8,9 @@ import sys
 import uuid
 from pathlib import Path
 
-from runtime.capability_graph import CapabilityGraphStore
+from runtime.domain_store_factory import create_capability_store
 from runtime.execution_store_factory import create_execution_store
-from runtime.learner_execution_runner import (
-    learner_assessment_summary,
-    resume_learner_assessment,
-    start_learner_assessment,
-)
+from runtime.learner_execution_runner import learner_assessment_summary, resume_learner_assessment, start_learner_assessment
 from runtime.learner_progress_store import LearnerProgressStore
 from runtime.openai_learner_provider import OpenAILearnerSupportProvider
 
@@ -30,11 +26,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--capability-db", default=str(DEFAULT_CAPABILITY_DB))
     parser.add_argument("--execution-db", default=str(DEFAULT_EXECUTION_DB))
     subparsers = parser.add_subparsers(dest="command", required=True)
-
     start = subparsers.add_parser("start", help="Start deidentified coaching and evidence-readiness processing.")
     start.add_argument("--submission-id", required=True)
     start.add_argument("--execution-id", default=None)
-
     review = subparsers.add_parser("review", help="Record the accountable human evidence-review decision.")
     review.add_argument("--execution-id", required=True)
     decision = review.add_mutually_exclusive_group(required=True)
@@ -42,7 +36,6 @@ def build_parser() -> argparse.ArgumentParser:
     decision.add_argument("--revise", action="store_true")
     review.add_argument("--reviewer-id", required=True)
     review.add_argument("--note", required=True)
-
     status = subparsers.add_parser("status", help="Read stored graph status without a model call.")
     status.add_argument("--execution-id", required=True)
     return parser
@@ -57,9 +50,8 @@ def _provider(*, live_call: bool) -> OpenAILearnerSupportProvider:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     progress = LearnerProgressStore(args.learner_db)
-    capabilities = CapabilityGraphStore(args.capability_db)
+    capabilities = create_capability_store(args.capability_db)
     executions = create_execution_store(local_path=args.execution_db)
-
     try:
         if args.command == "start":
             execution = start_learner_assessment(
@@ -86,7 +78,6 @@ def main(argv: list[str] | None = None) -> int:
     except (KeyError, RuntimeError, TypeError, ValueError) as exc:
         print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
-
     print(json.dumps(learner_assessment_summary(execution), ensure_ascii=False, indent=2, sort_keys=True))
     return 2 if execution.status == "failed" else 0
 
