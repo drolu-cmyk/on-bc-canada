@@ -2,8 +2,8 @@
 
 Work Intelligence establishes that a capability matters. This store defines what
 the capability means, what must come before it, and what evidence can verify it.
-Agents may create drafts. Only an accountable human can activate or retire a
-capability definition.
+Agents may create drafts from validated work evidence. Only an accountable human
+can activate or retire a capability definition.
 """
 from __future__ import annotations
 
@@ -70,6 +70,19 @@ class EvidenceStandard:
 
 
 @dataclass(frozen=True)
+class CapabilityProvenance:
+    execution_id: str
+    relation_id: str
+    confidence: float
+
+    def __post_init__(self) -> None:
+        if not self.execution_id.strip() or not self.relation_id.strip():
+            raise ValueError("capability provenance requires an execution and relation")
+        if not 0 <= self.confidence <= 1:
+            raise ValueError("provenance confidence must be between 0 and 1")
+
+
+@dataclass(frozen=True)
 class CapabilityDraft:
     capability_id: str
     pathway_id: str
@@ -77,10 +90,8 @@ class CapabilityDraft:
     description: str
     target_level: CapabilityLevel
     evidence_standards: tuple[EvidenceStandard, ...]
+    provenance: tuple[CapabilityProvenance, ...]
     prerequisite_ids: tuple[str, ...] = ()
-    source_execution_ids: tuple[str, ...] = ()
-    source_relation_ids: tuple[str, ...] = ()
-    source_confidence: float = 0.0
 
     def __post_init__(self) -> None:
         if not _CAPABILITY_ID.fullmatch(self.capability_id):
@@ -95,10 +106,16 @@ class CapabilityDraft:
             raise ValueError(f"unsupported target level: {self.target_level}")
         if not self.evidence_standards:
             raise ValueError("a capability requires at least one evidence standard")
+        if not self.provenance:
+            raise ValueError("a capability draft requires Work Intelligence provenance")
         if self.capability_id in self.prerequisite_ids:
             raise ValueError("a capability cannot require itself")
-        if not 0 <= self.source_confidence <= 1:
-            raise ValueError("source confidence must be between 0 and 1")
+        if len(set(self.prerequisite_ids)) != len(self.prerequisite_ids):
+            raise ValueError("duplicate capability prerequisites are not allowed")
+
+    @property
+    def source_confidence(self) -> float:
+        return max(item.confidence for item in self.provenance)
 
 
 class CapabilityGraphStore:
@@ -207,6 +224,14 @@ class CapabilityGraphStore:
         if not matching:
             raise ValueError("capability has no active pathway evidence in Work Intelligence")
 
+        provenance = tuple(
+            CapabilityProvenance(
+                execution_id=item["execution_id"],
+                relation_id=item["relation_id"],
+                confidence=float(item["confidence"]),
+            )
+            for item in sorted(matching, key=lambda value: (value["execution_id"], value["relation_id"]))
+        )
         definition = CapabilityDraft(
             capability_id=capability_id,
             pathway_id=pathway_id,
@@ -215,9 +240,7 @@ class CapabilityGraphStore:
             target_level=target_level,
             evidence_standards=evidence_standards,
             prerequisite_ids=prerequisite_ids,
-            source_execution_ids=tuple(sorted({item["execution_id"] for item in matching})),
-            source_relation_ids=tuple(sorted({item["relation_id"] for item in matching})),
-            source_confidence=max(float(item["confidence"]) for item in matching),
+            provenance=provenance,
         )
         self.save_draft(definition)
         return definition
@@ -268,18 +291,9 @@ class CapabilityGraphStore:
                     now,
                 ),
             )
-            connection.execute(
-                "DELETE FROM capability_prerequisites WHERE capability_id = ?",
-                (definition.capability_id,),
-            )
-            connection.execute(
-                "DELETE FROM capability_evidence_standards WHERE capability_id = ?",
-                (definition.capability_id,),
-            )
-            connection.execute(
-                "DELETE FROM capability_provenance WHERE capability_id = ?",
-                (definition.capability_id,),
-            )
+            connection.execute("DELETE FROM capability_prerequisites WHERE capability_id = ?", (definition.capability_id,))
+            connection.execute("DELETE FROM capability_evidence_standards WHERE capability_id = ?", (definition.capability_id,))
+            connection.execute("DELETE FROM capability_provenance WHERE capability_id = ?", (definition.capability_id,))
 
             for prerequisite_id in definition.prerequisite_ids:
                 connection.execute(
@@ -306,14 +320,14 @@ class CapabilityGraphStore:
                         int(standard.requires_changed_scenario),
                     ),
                 )
-            for execution_id, relation_id in zip(definition.source_execution_ids, definition.source_relation_ids):
+            for item in definition.provenance:
                 connection.execute(
                     """
                     INSERT INTO capability_provenance (
                         capability_id, execution_id, relation_id, confidence
                     ) VALUES (?, ?, ?, ?)
                     """,
-                    (definition.capability_id, execution_id, relation_id, definition.source_confidence),
+                    (definition.capability_id, item.execution_id, item.relation_id, item.confidence),
                 )
 
     def activate(self, capability_id: str, *, approver_id: str, note: str = "") -> dict[str, Any]:
@@ -333,8 +347,14 @@ class CapabilityGraphStore:
                 "SELECT COUNT(*) AS count FROM capability_evidence_standards WHERE capability_id = ?",
                 (capability_id,),
             ).fetchone()["count"]
+            provenance_count = connection.execute(
+                "SELECT COUNT(*) AS count FROM capability_provenance WHERE capability_id = ?",
+                (capability_id,),
+            ).fetchone()["count"]
             if evidence_count < 1:
                 raise ValueError("capability has no evidence standard")
+            if provenance_count < 1:
+                raise ValueError("capability has no Work Intelligence provenance")
 
             prerequisites = connection.execute(
                 """
@@ -404,10 +424,7 @@ class CapabilityGraphStore:
 
     def get(self, capability_id: str) -> dict[str, Any]:
         with self._connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM capabilities WHERE capability_id = ?",
-                (capability_id,),
-            ).fetchone()
+            row = connection.execute("SELECT * FROM capabilities WHERE capability_id = ?", (capability_id,)).fetchone()
             if row is None:
                 raise KeyError(f"capability not found: {capability_id}")
             prerequisites = connection.execute(
