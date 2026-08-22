@@ -24,6 +24,8 @@ WorkType = Literal[
     "learner_execution",
     "career_mobility",
     "employer_workforce",
+    "outcomes_intelligence",
+    "runtime_assurance",
 ]
 
 
@@ -58,13 +60,15 @@ def build_platform_orchestrator_agent(model: str | None = None) -> Any:
         model=model_name,
         instructions=(
             "Choose exactly one registered first-step work type for the supplied platform objective. "
-            "The registered choices are research_intelligence, product_development, business_operations, learner_execution, career_mobility, and employer_workforce. "
+            "The registered choices are research_intelligence, product_development, business_operations, learner_execution, career_mobility, employer_workforce, outcomes_intelligence, and runtime_assurance. "
             "Research_intelligence validates changing Canadian work, technology, and capability signals. Product_development coordinates product and platform design work. "
             "Business_operations covers growth, marketing, partnerships, operations, and finance analysis. Learner_execution handles deidentified coaching and evidence-readiness workflow. "
             "Career_mobility interprets already human-accepted capability evidence for learner guidance. Employer_workforce analyzes organization-level workflows and bounded AI adoption without employee decisions. "
+            "Outcomes_intelligence interprets privacy-released aggregate programme outcomes and can formulate questions for independent Research Intelligence validation. "
+            "Runtime_assurance interprets aggregate graph execution and control telemetry and can recommend human investigation or a Product Development remediation problem; it cannot change runtime policy. "
             "Choose the first necessary work type when an objective spans several stages; later handoffs are governed outside this model. "
             "Never invent a work type, side effect, authority level, data class, credential, hiring decision, financial action, production action, or external contact. "
-            "Do not ask for raw learner submissions, direct learner identifiers, individual employee performance data, payment credentials, or production secrets. "
+            "Do not ask for raw learner submissions, direct learner identifiers, individual employee performance data, payment credentials, production secrets, raw prompts, or raw model outputs. "
             "Risk flags should identify boundary concerns visible from the envelope only. The deterministic platform graph harness makes the final routing decision."
         ),
         output_type=PlatformRouteOutput,
