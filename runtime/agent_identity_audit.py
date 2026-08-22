@@ -13,6 +13,7 @@ from runtime.openai_business_operations_provider import OpenAIBusinessOperations
 from runtime.openai_career_mobility_provider import OpenAICareerMobilityProvider, build_career_agents
 from runtime.openai_employer_workforce_provider import OpenAIEmployerWorkforceProvider, build_employer_workforce_agents
 from runtime.openai_learner_provider import OpenAILearnerSupportProvider, build_learner_agents
+from runtime.openai_learning_provider import OpenAILearningDesignProvider, build_learning_design_agent
 from runtime.openai_outcomes_provider import OpenAIOutcomesIntelligenceProvider, build_outcomes_agents
 from runtime.openai_platform_orchestrator import OpenAIPlatformOrchestrator, build_platform_orchestrator_agent
 from runtime.openai_product_provider import OpenAIProductDevelopmentProvider, build_product_agents
@@ -58,6 +59,7 @@ def _sdk_inventory(model: str = "gpt-5.6-sol") -> tuple[dict[str, Any], dict[str
     product = build_product_agents(model=model)
     business = build_business_agents(model=model)
     learner = build_learner_agents(model=model)
+    learning_design = build_learning_design_agent(model=model)
     career = build_career_agents(model=model)
     employer = build_employer_workforce_agents(model=model)
     outcomes = build_outcomes_agents(model=model)
@@ -106,6 +108,7 @@ def _sdk_inventory(model: str = "gpt-5.6-sol") -> tuple[dict[str, Any], dict[str
         "outcomes-challenge-agent": outcomes.challenge_agent,
         "runtime-reliability-agent": runtime_assurance.reliability_agent,
         "runtime-control-agent": runtime_assurance.control_agent,
+        "learning-design-agent": learning_design,
         "platform-orchestrator-agent": orchestrator,
     }
 
@@ -119,6 +122,7 @@ def _sdk_inventory(model: str = "gpt-5.6-sol") -> tuple[dict[str, Any], dict[str
         "employer_workforce": OpenAIEmployerWorkforceProvider(agents=employer, runner=marker).max_turns,
         "outcomes_intelligence": OpenAIOutcomesIntelligenceProvider(agents=outcomes, runner=marker).max_turns,
         "runtime_assurance": OpenAIRuntimeAssuranceProvider(agents=runtime_assurance, runner=marker).max_turns,
+        "learning_design": OpenAILearningDesignProvider(agent=learning_design, runner=marker).max_turns,
         "platform_orchestration": OpenAIPlatformOrchestrator(agent=orchestrator, runner=marker).max_turns,
     }
     return agents, provider_turns
