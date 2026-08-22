@@ -1,201 +1,34 @@
 {
-  "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "GitHub OIDC deployment role for the SozoRock Canada public site.",
-  "Parameters": {
-    "GitHubOwner": {
-      "Type": "String",
-      "Default": "drolu-cmyk",
-      "Description": "GitHub owner for the trusted repository.",
-      "AllowedPattern": "^[A-Za-z0-9_.-]+$"
-    },
-    "GitHubRepository": {
-      "Type": "String",
-      "Default": "on-bc-canada",
-      "Description": "GitHub repository for the trusted workflow.",
-      "AllowedPattern": "^[A-Za-z0-9_.-]+$"
-    },
-    "GitHubBranch": {
-      "Type": "String",
-      "Default": "main",
-      "Description": "GitHub branch allowed to assume the deployment role.",
-      "AllowedPattern": "^[A-Za-z0-9._/-]+$"
-    },
-    "PublicSiteBucketName": {
-      "Type": "String",
-      "Default": "sozorock-ca-public-site-891377012881",
-      "Description": "Dedicated private S3 bucket used by the public-site stack.",
-      "AllowedPattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
-    }
+  "AWSTemplateFormatVersion":"2010-09-09",
+  "Description":"GitHub OIDC deployment role for the SozoRock Canada public site and engagement backend.",
+  "Parameters":{
+    "GitHubOwner":{"Type":"String","Default":"drolu-cmyk","AllowedPattern":"^[A-Za-z0-9_.-]+$"},
+    "GitHubRepository":{"Type":"String","Default":"on-bc-canada","AllowedPattern":"^[A-Za-z0-9_.-]+$"},
+    "GitHubBranch":{"Type":"String","Default":"main","AllowedPattern":"^[A-Za-z0-9._/-]+$"},
+    "PublicSiteBucketName":{"Type":"String","Default":"sozorock-ca-public-site-891377012881","AllowedPattern":"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"}
   },
-  "Resources": {
-    "GitHubActionsOidcProvider": {
-      "Type": "AWS::IAM::OIDCProvider",
-      "Properties": {
-        "Url": "https://token.actions.githubusercontent.com",
-        "ClientIdList": ["sts.amazonaws.com"]
-      }
-    },
-    "GitHubActionsDeployRole": {
-      "Type": "AWS::IAM::Role",
-      "Properties": {
-        "RoleName": "SozoRockCanadaPublicSiteDeploy",
-        "Description": "Short-lived GitHub OIDC role for automated SozoRock Canada publication.",
-        "AssumeRolePolicyDocument": {
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Effect": "Allow",
-              "Principal": {"Federated": {"Ref": "GitHubActionsOidcProvider"}},
-              "Action": "sts:AssumeRoleWithWebIdentity",
-              "Condition": {
-                "StringEquals": {"token.actions.githubusercontent.com:aud": "sts.amazonaws.com"},
-                "StringLike": {
-                  "token.actions.githubusercontent.com:sub": [
-                    {"Fn::Sub": "repo:${GitHubOwner}/${GitHubRepository}:ref:refs/heads/${GitHubBranch}"},
-                    {"Fn::Sub": "repo:${GitHubOwner}@*/${GitHubRepository}@*:ref:refs/heads/${GitHubBranch}"}
-                  ]
-                }
-              }
-            }
-          ]
-        },
-        "Policies": [
-          {
-            "PolicyName": "SozoRockCanadaPublicSiteDeployment",
-            "PolicyDocument": {
-              "Version": "2012-10-17",
-              "Statement": [
-                {
-                  "Sid": "CloudFormationDeployment",
-                  "Effect": "Allow",
-                  "Action": [
-                    "cloudformation:CreateChangeSet",
-                    "cloudformation:CreateStack",
-                    "cloudformation:DeleteChangeSet",
-                    "cloudformation:DeleteStack",
-                    "cloudformation:DescribeChangeSet",
-                    "cloudformation:DescribeStackEvents",
-                    "cloudformation:DescribeStackResource",
-                    "cloudformation:DescribeStackResources",
-                    "cloudformation:DescribeStacks",
-                    "cloudformation:ExecuteChangeSet",
-                    "cloudformation:GetTemplate",
-                    "cloudformation:GetTemplateSummary",
-                    "cloudformation:ListChangeSets",
-                    "cloudformation:ListStackResources",
-                    "cloudformation:UpdateStack",
-                    "cloudformation:ValidateTemplate"
-                  ],
-                  "Resource": "*"
-                },
-                {
-                  "Sid": "StaticSiteBucket",
-                  "Effect": "Allow",
-                  "Action": [
-                    "s3:AbortMultipartUpload",
-                    "s3:CreateBucket",
-                    "s3:DeleteBucket",
-                    "s3:DeleteBucketPolicy",
-                    "s3:DeleteObject",
-                    "s3:GetEncryptionConfiguration",
-                    "s3:GetBucketLocation",
-                    "s3:GetBucketOwnershipControls",
-                    "s3:GetBucketPolicy",
-                    "s3:GetBucketPolicyStatus",
-                    "s3:GetBucketPublicAccessBlock",
-                    "s3:GetBucketTagging",
-                    "s3:GetBucketVersioning",
-                    "s3:GetObject",
-                    "s3:ListBucket",
-                    "s3:ListBucketVersions",
-                    "s3:ListBucketMultipartUploads",
-                    "s3:ListMultipartUploadParts",
-                    "s3:PutEncryptionConfiguration",
-                    "s3:PutBucketOwnershipControls",
-                    "s3:PutBucketPolicy",
-                    "s3:PutBucketPublicAccessBlock",
-                    "s3:PutBucketTagging",
-                    "s3:PutBucketVersioning",
-                    "s3:PutObject"
-                  ],
-                  "Resource": [
-                    {"Fn::Sub": "arn:${AWS::Partition}:s3:::${PublicSiteBucketName}"},
-                    {"Fn::Sub": "arn:${AWS::Partition}:s3:::${PublicSiteBucketName}/*"}
-                  ]
-                },
-                {
-                  "Sid": "CloudFrontDistribution",
-                  "Effect": "Allow",
-                  "Action": [
-                    "cloudfront:CreateDistribution",
-                    "cloudfront:CreateFunction",
-                    "cloudfront:CreateInvalidation",
-                    "cloudfront:CreateOriginAccessControl",
-                    "cloudfront:DeleteDistribution",
-                    "cloudfront:DeleteFunction",
-                    "cloudfront:DeleteOriginAccessControl",
-                    "cloudfront:DescribeFunction",
-                    "cloudfront:GetDistribution",
-                    "cloudfront:GetDistributionConfig",
-                    "cloudfront:GetFunction",
-                    "cloudfront:GetInvalidation",
-                    "cloudfront:GetOriginAccessControl",
-                    "cloudfront:ListDistributions",
-                    "cloudfront:ListDomainConflicts",
-                    "cloudfront:ListFunctions",
-                    "cloudfront:ListOriginAccessControls",
-                    "cloudfront:ListTagsForResource",
-                    "cloudfront:PublishFunction",
-                    "cloudfront:TagResource",
-                    "cloudfront:UntagResource",
-                    "cloudfront:UpdateDomainAssociation",
-                    "cloudfront:UpdateDistribution",
-                    "cloudfront:UpdateFunction",
-                    "cloudfront:UpdateOriginAccessControl"
-                  ],
-                  "Resource": "*"
-                },
-                {
-                  "Sid": "CertificateLifecycle",
-                  "Effect": "Allow",
-                  "Action": ["acm:DescribeCertificate", "acm:ListCertificates", "acm:RequestCertificate"],
-                  "Resource": "*"
-                },
-                {
-                  "Sid": "Route53Dns",
-                  "Effect": "Allow",
-                  "Action": [
-                    "route53:ChangeResourceRecordSets",
-                    "route53:GetChange",
-                    "route53:ListResourceRecordSets",
-                    "route53:ListHostedZonesByName"
-                  ],
-                  "Resource": "*"
-                },
-                {
-                  "Sid": "CloudFrontServiceLinkedRole",
-                  "Effect": "Allow",
-                  "Action": "iam:CreateServiceLinkedRole",
-                  "Resource": "*",
-                  "Condition": {"StringEquals": {"iam:AWSServiceName": "cloudfront.amazonaws.com"}}
-                },
-                {
-                  "Sid": "IdentityCheck",
-                  "Effect": "Allow",
-                  "Action": "sts:GetCallerIdentity",
-                  "Resource": "*"
-                }
-              ]
-            }
-          }
-        ]
-      }
-    }
+  "Resources":{
+    "GitHubActionsOidcProvider":{"Type":"AWS::IAM::OIDCProvider","Properties":{"Url":"https://token.actions.githubusercontent.com","ClientIdList":["sts.amazonaws.com"]}},
+    "GitHubActionsDeployRole":{"Type":"AWS::IAM::Role","Properties":{
+      "RoleName":"SozoRockCanadaPublicSiteDeploy",
+      "Description":"Short-lived GitHub OIDC role for automated SozoRock Canada publication.",
+      "AssumeRolePolicyDocument":{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Federated":{"Ref":"GitHubActionsOidcProvider"}},"Action":"sts:AssumeRoleWithWebIdentity","Condition":{"StringEquals":{"token.actions.githubusercontent.com:aud":"sts.amazonaws.com"},"StringLike":{"token.actions.githubusercontent.com:sub":[{"Fn::Sub":"repo:${GitHubOwner}/${GitHubRepository}:ref:refs/heads/${GitHubBranch}"},{"Fn::Sub":"repo:${GitHubOwner}@*/${GitHubRepository}@*:ref:refs/heads/${GitHubBranch}"}]}}}]},
+      "Policies":[{"PolicyName":"SozoRockCanadaPublicSiteDeployment","PolicyDocument":{"Version":"2012-10-17","Statement":[
+        {"Sid":"CloudFormationDeployment","Effect":"Allow","Action":["cloudformation:CreateChangeSet","cloudformation:CreateStack","cloudformation:DeleteChangeSet","cloudformation:DeleteStack","cloudformation:DescribeChangeSet","cloudformation:DescribeStackEvents","cloudformation:DescribeStackResource","cloudformation:DescribeStackResources","cloudformation:DescribeStacks","cloudformation:ExecuteChangeSet","cloudformation:GetTemplate","cloudformation:GetTemplateSummary","cloudformation:ListChangeSets","cloudformation:ListStackResources","cloudformation:UpdateStack","cloudformation:ValidateTemplate"],"Resource":"*"},
+        {"Sid":"StaticSiteBucket","Effect":"Allow","Action":["s3:AbortMultipartUpload","s3:CreateBucket","s3:DeleteBucket","s3:DeleteBucketPolicy","s3:DeleteObject","s3:GetEncryptionConfiguration","s3:GetBucketLocation","s3:GetBucketOwnershipControls","s3:GetBucketPolicy","s3:GetBucketPolicyStatus","s3:GetBucketPublicAccessBlock","s3:GetBucketTagging","s3:GetBucketVersioning","s3:GetObject","s3:ListBucket","s3:ListBucketVersions","s3:ListBucketMultipartUploads","s3:ListMultipartUploadParts","s3:PutEncryptionConfiguration","s3:PutBucketOwnershipControls","s3:PutBucketPolicy","s3:PutBucketPublicAccessBlock","s3:PutBucketTagging","s3:PutBucketVersioning","s3:PutObject"],"Resource":[{"Fn::Sub":"arn:${AWS::Partition}:s3:::${PublicSiteBucketName}"},{"Fn::Sub":"arn:${AWS::Partition}:s3:::${PublicSiteBucketName}/*"}]},
+        {"Sid":"CloudFrontDistribution","Effect":"Allow","Action":["cloudfront:CreateDistribution","cloudfront:CreateFunction","cloudfront:CreateInvalidation","cloudfront:CreateOriginAccessControl","cloudfront:DeleteDistribution","cloudfront:DeleteFunction","cloudfront:DeleteOriginAccessControl","cloudfront:DescribeFunction","cloudfront:GetDistribution","cloudfront:GetDistributionConfig","cloudfront:GetFunction","cloudfront:GetInvalidation","cloudfront:GetOriginAccessControl","cloudfront:ListDistributions","cloudfront:ListDomainConflicts","cloudfront:ListFunctions","cloudfront:ListOriginAccessControls","cloudfront:ListTagsForResource","cloudfront:PublishFunction","cloudfront:TagResource","cloudfront:UntagResource","cloudfront:UpdateDomainAssociation","cloudfront:UpdateDistribution","cloudfront:UpdateFunction","cloudfront:UpdateOriginAccessControl"],"Resource":"*"},
+        {"Sid":"CertificateLifecycle","Effect":"Allow","Action":["acm:DescribeCertificate","acm:ListCertificates","acm:RequestCertificate"],"Resource":"*"},
+        {"Sid":"Route53Dns","Effect":"Allow","Action":["route53:ChangeResourceRecordSets","route53:GetChange","route53:ListResourceRecordSets","route53:ListHostedZonesByName"],"Resource":"*"},
+        {"Sid":"EngagementTable","Effect":"Allow","Action":["dynamodb:CreateTable","dynamodb:DeleteTable","dynamodb:DescribeTable","dynamodb:DescribeContinuousBackups","dynamodb:ListTagsOfResource","dynamodb:TagResource","dynamodb:UntagResource","dynamodb:UpdateContinuousBackups","dynamodb:UpdateTable"],"Resource":{"Fn::Sub":"arn:${AWS::Partition}:dynamodb:ca-central-1:${AWS::AccountId}:table/sozorock-ca-engagement-submissions"}},
+        {"Sid":"EngagementNotifications","Effect":"Allow","Action":["sns:CreateTopic","sns:DeleteTopic","sns:GetTopicAttributes","sns:SetTopicAttributes","sns:Subscribe","sns:Unsubscribe","sns:ListSubscriptionsByTopic","sns:TagResource","sns:UntagResource"],"Resource":"*"},
+        {"Sid":"EngagementLambda","Effect":"Allow","Action":["lambda:CreateFunction","lambda:DeleteFunction","lambda:GetFunction","lambda:GetFunctionConfiguration","lambda:UpdateFunctionCode","lambda:UpdateFunctionConfiguration","lambda:AddPermission","lambda:RemovePermission","lambda:ListTags","lambda:TagResource","lambda:UntagResource"],"Resource":{"Fn::Sub":"arn:${AWS::Partition}:lambda:ca-central-1:${AWS::AccountId}:function:sozorock-ca-engagement"}},
+        {"Sid":"EngagementApi","Effect":"Allow","Action":["apigateway:GET","apigateway:POST","apigateway:PUT","apigateway:PATCH","apigateway:DELETE"],"Resource":"*"},
+        {"Sid":"EngagementCognito","Effect":"Allow","Action":["cognito-idp:CreateUserPool","cognito-idp:DeleteUserPool","cognito-idp:UpdateUserPool","cognito-idp:DescribeUserPool","cognito-idp:CreateUserPoolClient","cognito-idp:UpdateUserPoolClient","cognito-idp:DeleteUserPoolClient","cognito-idp:DescribeUserPoolClient","cognito-idp:CreateUserPoolDomain","cognito-idp:DeleteUserPoolDomain","cognito-idp:DescribeUserPoolDomain","cognito-idp:CreateGroup","cognito-idp:UpdateGroup","cognito-idp:DeleteGroup","cognito-idp:GetGroup","cognito-idp:AdminCreateUser","cognito-idp:AdminDeleteUser","cognito-idp:AdminGetUser","cognito-idp:AdminAddUserToGroup","cognito-idp:AdminRemoveUserFromGroup","cognito-idp:ListUsers","cognito-idp:ListGroups","cognito-idp:ListUsersInGroup","cognito-idp:TagResource","cognito-idp:UntagResource"],"Resource":"*"},
+        {"Sid":"EngagementFunctionRole","Effect":"Allow","Action":["iam:CreateRole","iam:DeleteRole","iam:GetRole","iam:TagRole","iam:UntagRole","iam:PutRolePolicy","iam:GetRolePolicy","iam:DeleteRolePolicy","iam:ListRolePolicies","iam:PassRole"],"Resource":{"Fn::Sub":"arn:${AWS::Partition}:iam::${AWS::AccountId}:role/SozoRockCanadaEngagementFunction"}},
+        {"Sid":"CloudFrontServiceLinkedRole","Effect":"Allow","Action":"iam:CreateServiceLinkedRole","Resource":"*","Condition":{"StringEquals":{"iam:AWSServiceName":"cloudfront.amazonaws.com"}}},
+        {"Sid":"IdentityCheck","Effect":"Allow","Action":"sts:GetCallerIdentity","Resource":"*"}
+      ]}}]
+    }}
   },
-  "Outputs": {
-    "GitHubActionsDeployRoleArn": {
-      "Description": "Role ARN used by the GitHub OIDC deployment workflow.",
-      "Value": {"Fn::GetAtt": ["GitHubActionsDeployRole", "Arn"]}
-    }
-  }
+  "Outputs":{"GitHubActionsDeployRoleArn":{"Value":{"Fn::GetAtt":["GitHubActionsDeployRole","Arn"]}}}
 }

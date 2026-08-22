@@ -1,0 +1,1 @@
+window.SOZOROCK_ENGAGEMENT={apiEndpoint:'',adminClientId:'',adminDomain:'',adminUserPoolId:'',redirectUri:'https://canada.sozorock.com/admin'};
