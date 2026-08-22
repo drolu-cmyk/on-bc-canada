@@ -7,8 +7,7 @@ import os
 import sys
 from pathlib import Path
 
-from runtime.capability_graph import CapabilityGraphStore
-from runtime.learning_graph import LearningGraphStore
+from runtime.domain_store_factory import create_capability_store, create_learning_store
 from runtime.openai_learning_provider import LearningDesignContext, OpenAILearningDesignProvider
 
 
@@ -18,8 +17,8 @@ DEFAULT_CAPABILITY_DB = Path(os.getenv("SOZOROCK_CAPABILITY_DB", "local-data/cap
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Operate the reviewed Learning Graph.")
-    parser.add_argument("--db", default=str(DEFAULT_LEARNING_DB), help="Learning Graph SQLite path.")
-    parser.add_argument("--capability-db", default=str(DEFAULT_CAPABILITY_DB), help="Capability Graph SQLite path.")
+    parser.add_argument("--db", default=str(DEFAULT_LEARNING_DB), help="Local Learning Graph SQLite path when SOZOROCK_DOMAIN_BACKEND=local.")
+    parser.add_argument("--capability-db", default=str(DEFAULT_CAPABILITY_DB), help="Local Capability Graph SQLite path when SOZOROCK_DOMAIN_BACKEND=local.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     design = subparsers.add_parser("design", help="Generate and validate a candidate learning path from active capabilities.")
@@ -52,7 +51,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     active = subparsers.add_parser("active", help="Read the active path for one pathway.")
     active.add_argument("--pathway-id", required=True)
-
     return parser
 
 
@@ -68,8 +66,8 @@ def _module_context(items: list[str]) -> tuple[dict[str, object], ...]:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    learning = LearningGraphStore(args.db)
-    capabilities = CapabilityGraphStore(args.capability_db)
+    learning = create_learning_store(args.db)
+    capabilities = create_capability_store(args.capability_db)
 
     try:
         if args.command == "design":
@@ -86,19 +84,9 @@ def main(argv: list[str] | None = None) -> int:
             definition = OpenAILearningDesignProvider().propose(context)
             result = learning.save_candidate(definition, capabilities=capabilities)
         elif args.command == "activate":
-            result = learning.activate(
-                args.pathway_id,
-                args.version,
-                approver_id=args.approver_id,
-                note=args.note,
-            )
+            result = learning.activate(args.pathway_id, args.version, approver_id=args.approver_id, note=args.note)
         elif args.command == "retire":
-            result = learning.retire(
-                args.pathway_id,
-                args.version,
-                approver_id=args.approver_id,
-                note=args.note,
-            )
+            result = learning.retire(args.pathway_id, args.version, approver_id=args.approver_id, note=args.note)
         elif args.command == "inspect":
             result = learning.get(args.pathway_id, args.version)
         else:
