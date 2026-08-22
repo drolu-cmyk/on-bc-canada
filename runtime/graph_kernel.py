@@ -10,6 +10,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
+from runtime.agent_runtime_guard import assert_graph_agent_runtime_allowed
 from runtime.control_plane import EventLedger
 
 ActorKind = Literal["service", "agent", "human"]
@@ -153,6 +154,12 @@ class GraphKernel:
                 }
                 self._event(execution, "graph.approval_requested.v1", execution.pending_approval)
                 return execution
+
+            if node.actor.kind == "agent":
+                try:
+                    assert_graph_agent_runtime_allowed(node.actor.actor_id)
+                except Exception as exc:
+                    return self._fail(execution, f"agent runtime policy blocked {node.node_id}: {exc}")
 
             handler = self.handlers.get(node.handler or "")
             if not handler:

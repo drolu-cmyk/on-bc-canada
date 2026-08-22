@@ -13,6 +13,7 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
 
+from runtime.agent_identity_registry import ORCHESTRATOR_DATA, assert_agent_runtime_allowed
 from runtime.platform_graph_harness import DispatchMode
 
 
@@ -90,6 +91,11 @@ class OpenAIPlatformOrchestrator:
     def propose(self, envelope: OrchestrationEnvelope) -> dict[str, Any]:
         if not envelope.objective.strip():
             raise ValueError("platform orchestration requires an objective")
+        assert_agent_runtime_allowed(
+            self.agent,
+            requested_max_turns=self.max_turns,
+            declared_model_data_classes=ORCHESTRATOR_DATA,
+        )
         prompt = (
             "Select the first registered platform work type for this metadata-only orchestration envelope.\n\n"
             "INPUT_JSON\n"
