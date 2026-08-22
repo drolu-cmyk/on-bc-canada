@@ -1,19 +1,30 @@
 """Pre-call guard for GraphKernel model actors.
 
-GraphKernel cannot inspect provider-specific SDK tools, so tool drift is checked by
-the SDK construction audit. It can, however, enforce the stable non-human
-identity, emergency disable state, authority, and effective turn-budget boundary
-before any agent node handler is invoked.
+GraphKernel is also used by local test and extension graphs. The mandatory NHI
+check applies to production graph actors represented by this registry; generic
+unregistered graphs can still use GraphKernel without pretending to have a
+production identity. CI separately requires every registered platform graph agent
+to have an identity before it can merge.
 """
 from __future__ import annotations
 
-from runtime.agent_identity_registry import effective_turn_limit, identity_for_actor, is_identity_enabled
+from runtime.agent_identity_registry import AGENT_IDENTITIES, effective_turn_limit, is_identity_enabled
 
 
-def assert_graph_agent_runtime_allowed(actor_id: str):
-    identity = identity_for_actor(actor_id)
+def assert_graph_agent_runtime_allowed(actor_id: str, graph_id: str):
+    identity = AGENT_IDENTITIES.get(actor_id)
+    registered_graph_ids = {item.graph_id for item in AGENT_IDENTITIES.values() if item.graph_id is not None}
+    if identity is None:
+        if graph_id in registered_graph_ids:
+            raise RuntimeError(f"registered graph agent has no non-human identity: {graph_id}:{actor_id}")
+        return None
     if identity.graph_id is None:
         raise RuntimeError(f"graph agent cannot use a non-graph identity: {identity.identity_id}")
+    if identity.graph_id != graph_id:
+        raise RuntimeError(
+            f"agent identity graph binding mismatch for {identity.identity_id}: "
+            f"identity={identity.graph_id} execution={graph_id}"
+        )
     if identity.authority != "A1":
         raise RuntimeError(f"graph model agent authority must remain A1: {identity.identity_id}")
     if identity.secret_access:
