@@ -5,7 +5,8 @@ import os
 from pathlib import Path
 from typing import Any
 
-from runtime.aws_durable_execution import DynamoGraphExecutionStore, AwsDurableExecutionConfig, aws_execution_enabled
+from runtime.aws_durable_execution import AwsDurableExecutionConfig, aws_execution_enabled
+from runtime.durable_execution_store import DurableGraphExecutionStore
 from runtime.graph_execution_store import GraphExecutionStore
 
 
@@ -30,4 +31,4 @@ def create_execution_store(
     backend = execution_backend()
     if backend == "local":
         return GraphExecutionStore(local_path)
-    return DynamoGraphExecutionStore(config=aws_config, client=dynamodb_client)
+    return DurableGraphExecutionStore(config=aws_config, client=dynamodb_client)
