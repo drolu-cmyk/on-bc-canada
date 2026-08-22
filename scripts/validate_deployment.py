@@ -72,7 +72,7 @@ def validate_template() -> list[str]:
     if route_function.get("FunctionConfig", {}).get("Runtime") != "cloudfront-js-2.0":
         errors.append("canonical route function must use cloudfront-js-2.0")
     function_code = route_function.get("FunctionCode", "")
-    for required_fragment in ["/index.html", ".html", "request.uri = uri + '.html'"]:
+    for required_fragment in ["/index.html", "/program.html", "/programs", ".html", "request.uri = uri + '.html'"]:
         if required_fragment not in function_code:
             errors.append(f"canonical route function is missing {required_fragment}")
 
@@ -115,10 +115,7 @@ def validate_template() -> list[str]:
     if behavior.get("ViewerProtocolPolicy") != "redirect-to-https":
         errors.append("public site must redirect HTTP to HTTPS")
     associations = behavior.get("FunctionAssociations", [])
-    expected_association = {
-        "EventType": "viewer-request",
-        "FunctionARN": {"Fn::GetAtt": ["CanonicalRouteFunction", "FunctionARN"]},
-    }
+    expected_association = {"EventType": "viewer-request", "FunctionARN": {"Fn::GetAtt": ["CanonicalRouteFunction", "FunctionARN"]}}
     if associations != [expected_association]:
         errors.append("canonical CloudFront distribution must use only CanonicalRouteFunction on viewer-request")
     return errors
