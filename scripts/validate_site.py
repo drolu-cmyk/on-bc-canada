@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the static public information shell."""
+"""Validate the SozoRock Canada static public site and clean canonical routes."""
 
 from __future__ import annotations
 
@@ -7,24 +7,35 @@ import re
 import sys
 from pathlib import Path
 
-
 SITE = Path("site")
 CANONICAL_ORIGIN = "https://canada.sozorock.com"
-CONTENT_PAGES = {
-    "index.html",
-    "program.html",
-    "curriculum.html",
-    "enroll.html",
-    "accessibility.html",
-    "support.html",
-    "privacy.html",
-    "terms.html",
+CANONICAL_PAGES = {
+    "index.html": "/",
+    "about.html": "/about",
+    "programs.html": "/programs",
+    "curriculum.html": "/curriculum",
+    "enroll.html": "/enroll",
+    "impact.html": "/impact",
+    "stories.html": "/stories",
+    "contact.html": "/contact",
+    "accessibility.html": "/accessibility",
+    "support.html": "/support",
+    "privacy.html": "/privacy",
+    "terms.html": "/terms",
 }
-REQUIRED_PAGES = CONTENT_PAGES | {"404.html"}
+REQUIRED_PAGES = set(CANONICAL_PAGES) | {"404.html"}
+CLEAN_ROUTE_FILES = {route: page for page, route in CANONICAL_PAGES.items()}
 
 
-def canonical_path(page_name: str) -> str:
-    return "/" if page_name == "index.html" else f"/{page_name}"
+def local_target_exists(target: str) -> bool:
+    clean = target.split("#", 1)[0].split("?", 1)[0]
+    if clean in ("", "/"):
+        return (SITE / "index.html").is_file()
+    if clean.startswith("/"):
+        if clean in CLEAN_ROUTE_FILES:
+            return (SITE / CLEAN_ROUTE_FILES[clean]).is_file()
+        return (SITE / clean.lstrip("/")).is_file()
+    return (SITE / clean).is_file()
 
 
 def main() -> int:
@@ -32,52 +43,52 @@ def main() -> int:
     pages = {path.name for path in SITE.glob("*.html")}
     errors.extend(f"missing page: site/{name}" for name in sorted(REQUIRED_PAGES - pages))
 
+    legacy_program = SITE / "program.html"
+    if legacy_program.exists():
+        errors.append("site/program.html must be retired in favour of /programs")
+
     for path in sorted(SITE.glob("*.html")):
         source = path.read_text(encoding="utf-8")
-        for required in (
-            '<html lang="en-CA">',
-            '<meta name="viewport"',
-            '<meta name="description"',
-            "<title>",
-            'id="main"',
-        ):
+        for required in ('<html lang="en-CA">', '<meta name="viewport"', '<meta name="description"', "<title>", 'id="main"'):
             if required not in source:
                 errors.append(f"{path}: missing {required}")
         if source.count("<h1") != 1:
             errors.append(f"{path}: requires exactly one h1")
         if "<form" in source.lower():
             errors.append(f"{path}: live forms are not part of the public shell")
-        if path.name != "404.html" and 'href="#main"' not in source:
+        if 'href="#main"' not in source:
             errors.append(f"{path}: missing skip link")
 
-        if path.name in CONTENT_PAGES:
-            expected_url = f"{CANONICAL_ORIGIN}{canonical_path(path.name)}"
-            required_metadata = (
+        if path.name in CANONICAL_PAGES:
+            route = CANONICAL_PAGES[path.name]
+            expected_url = f"{CANONICAL_ORIGIN}{route}"
+            for required in (
                 f'<link rel="canonical" href="{expected_url}">',
                 f'<meta property="og:url" content="{expected_url}">',
                 '<meta name="twitter:card" content="summary">',
-            )
-            for required in required_metadata:
+            ):
                 if required not in source:
                     errors.append(f"{path}: missing {required}")
             if "sozorock.ca" in source:
                 errors.append(f"{path}: legacy .ca hostname must not appear in canonical public content")
-        elif '<meta name="robots" content="noindex">' not in source:
-            errors.append(f"{path}: missing noindex directive")
+        elif path.name == "404.html":
+            if '<meta name="robots" content="noindex">' not in source:
+                errors.append(f"{path}: missing noindex directive")
+        else:
+            errors.append(f"{path}: HTML page is not declared as canonical or 404")
 
         for target in re.findall(r'(?:href|src)="([^"]+)"', source):
-            if target.startswith(("http:", "https:", "#", "mailto:")):
+            if target.startswith(("http:", "https:", "#", "mailto:", "tel:")):
                 continue
-            target_path = path.parent / target.split("#", 1)[0]
-            if not target_path.exists():
+            if not local_target_exists(target):
                 errors.append(f"{path}: missing local link {target}")
 
-    if not (SITE / "styles.css").is_file():
-        errors.append("site/styles.css is missing")
+    for required_asset in ("styles.css", "reference-home.css", "site.js", "favicon.svg", "robots.txt", "sitemap.xml"):
+        if not (SITE / required_asset).is_file():
+            errors.append(f"site/{required_asset} is missing")
+
     robots_path = SITE / "robots.txt"
-    if not robots_path.is_file():
-        errors.append("site/robots.txt is missing")
-    else:
+    if robots_path.is_file():
         robots = robots_path.read_text(encoding="utf-8")
         sitemap_url = f"Sitemap: {CANONICAL_ORIGIN}/sitemap.xml"
         if sitemap_url not in robots:
@@ -86,14 +97,14 @@ def main() -> int:
             errors.append("site/robots.txt: legacy .ca hostname must not be advertised")
 
     sitemap_path = SITE / "sitemap.xml"
-    if not sitemap_path.is_file():
-        errors.append("site/sitemap.xml is missing")
-    else:
+    if sitemap_path.is_file():
         sitemap = sitemap_path.read_text(encoding="utf-8")
-        for page_name in sorted(CONTENT_PAGES):
-            expected_url = f"<loc>{CANONICAL_ORIGIN}{canonical_path(page_name)}</loc>"
+        for route in CANONICAL_PAGES.values():
+            expected_url = f"<loc>{CANONICAL_ORIGIN}{route}</loc>"
             if expected_url not in sitemap:
                 errors.append(f"site/sitemap.xml: missing {expected_url}")
+        if ".html</loc>" in sitemap or "/index.html</loc>" in sitemap:
+            errors.append("site/sitemap.xml: HTML filenames must not be canonical URLs")
         if "sozorock.ca" in sitemap:
             errors.append("site/sitemap.xml: legacy .ca hostname must not be indexed")
 
@@ -102,7 +113,7 @@ def main() -> int:
         print("\n".join(errors), file=sys.stderr)
         return 1
 
-    print(f"Static site validation passed for {len(pages)} pages on {CANONICAL_ORIGIN}.")
+    print(f"Static site validation passed for {len(pages)} pages with clean canonical routes on {CANONICAL_ORIGIN}.")
     return 0
 
 
