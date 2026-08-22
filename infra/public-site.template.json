@@ -69,6 +69,18 @@
         }
       }
     },
+    "CanonicalRouteFunction": {
+      "Type": "AWS::CloudFront::Function",
+      "Properties": {
+        "Name": {"Fn::Sub": "${AWS::StackName}-canonical-routes"},
+        "AutoPublish": true,
+        "FunctionConfig": {
+          "Comment": "Redirect legacy .html URLs and resolve clean static routes.",
+          "Runtime": "cloudfront-js-2.0"
+        },
+        "FunctionCode": "function handler(event) { var request = event.request; var uri = request.uri; if (uri === '/index.html') { return { statusCode: 301, statusDescription: 'Moved Permanently', headers: { location: { value: '/' }, 'cache-control': { value: 'public, max-age=86400' } } }; } if (uri.length > 5 && uri.slice(-5) === '.html') { var clean = uri.slice(0, -5); return { statusCode: 301, statusDescription: 'Moved Permanently', headers: { location: { value: clean || '/' }, 'cache-control': { value: 'public, max-age=86400' } } }; } var last = uri.split('/').pop(); if (uri !== '/' && last && last.indexOf('.') === -1) { request.uri = uri + '.html'; } return request; }"
+      }
+    },
     "PublicSiteDistribution": {
       "Type": "AWS::CloudFront::Distribution",
       "Properties": {
@@ -95,7 +107,13 @@
             "ForwardedValues": {
               "QueryString": false,
               "Cookies": {"Forward": "none"}
-            }
+            },
+            "FunctionAssociations": [
+              {
+                "EventType": "viewer-request",
+                "FunctionARN": {"Fn::GetAtt": ["CanonicalRouteFunction", "FunctionARN"]}
+              }
+            ]
           },
           "CustomErrorResponses": [
             {"ErrorCode": 403, "ResponseCode": 404, "ResponsePagePath": "/404.html", "ErrorCachingMinTTL": 60},
