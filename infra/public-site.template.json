@@ -106,7 +106,7 @@
             {
               "Id": "PublicSiteOrigin",
               "DomainName": {"Fn::GetAtt": ["PublicSiteBucket", "RegionalDomainName"]},
-              "S3OriginConfig": {},
+              "S3OriginConfig": {"OriginAccessIdentity": ""},
               "OriginAccessControlId": {"Ref": "PublicSiteOriginAccessControl"}
             }
           ],
