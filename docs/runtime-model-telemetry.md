@@ -28,6 +28,10 @@ privacy-bounded tracing processor
         ↓
 local telemetry SQLite
         ↓
+strict completed-trace summary
+        ↓ when explicitly enabled
+KMS-encrypted CloudWatch Logs + Embedded Metrics
+        ↓
 aggregate Runtime Assurance
 ```
 
@@ -35,7 +39,7 @@ GraphKernel attaches graph ID, graph version, execution ID, node ID, and actor I
 
 Learning Graph Design and Platform Orchestration set the same runtime context directly because they call the SDK outside GraphKernel.
 
-## Recorded trace facts
+## Recorded local trace facts
 
 The local trace table can contain:
 
@@ -51,7 +55,7 @@ The local trace table can contain:
 - trace latency
 - count of recorded spans, generations, and local tool spans
 
-The span table can contain:
+The local span table can contain:
 
 - span ID and trace ID
 - span type
@@ -89,6 +93,8 @@ The implementation also sets:
 
 ```text
 OPENAI_AGENTS_TRACE_INCLUDE_SENSITIVE_DATA=0
+OPENAI_AGENTS_DONT_LOG_MODEL_DATA=1
+OPENAI_AGENTS_DONT_LOG_TOOL_DATA=1
 ```
 
 before governed live model execution.
@@ -109,7 +115,23 @@ A different location may be supplied with:
 SOZOROCK_MODEL_TELEMETRY_DB
 ```
 
-`local-data/` is ignored by Git. This SQLite design is for local development and the current reference runtime, not the final AWS production telemetry store.
+`local-data/` is ignored by Git. Local SQLite remains useful for development and as a local evidence buffer even when AWS centralization is enabled.
+
+## AWS centralization
+
+`runtime/aws_runtime_observability.py` exports one strict summary after a governed trace completes.
+
+Centralized publishing is disabled unless this environment variable is explicitly enabled:
+
+```text
+SOZOROCK_AWS_OBSERVABILITY_ENABLED=1
+```
+
+The production stack uses AWS Canada Central and a KMS-encrypted CloudWatch log group. The direct execution ID stays in the local database; the centralized event receives only its one-way fingerprint.
+
+The centralized event is built from an allow-list of operational fields. Adding an arbitrary field to the local trace schema does not automatically export it to AWS.
+
+See [AWS Runtime Observability](aws-runtime-observability.md) for the infrastructure, IAM, alarms, retention, and deployment controls.
 
 ## Pricing inputs
 
@@ -135,7 +157,7 @@ Shape:
 
 The numeric zeros show the expected fields only. They are not prices.
 
-If a reviewed rate is unavailable, the telemetry record keeps token usage and marks pricing as unavailable. Runtime Assurance does not guess a cost.
+If a reviewed rate is unavailable, the telemetry record keeps token usage and marks pricing as unavailable. The centralized EstimatedModelCostUSD metric is omitted for that trace, and Runtime Assurance does not guess a cost.
 
 ## Latency coverage
 
@@ -145,7 +167,7 @@ The collector measures:
 - generation-span duration
 - local function or MCP tool-span duration when the SDK emits those spans
 
-It does not currently claim a separate latency measurement for OpenAI-hosted tools such as hosted web search when that duration is not exposed as an independently attributable local tool span.
+It does not claim a separate latency measurement for OpenAI-hosted tools such as hosted web search when that duration is not exposed as an independently attributable local tool span.
 
 That distinction is deliberate. Total model-run latency may include hosted-tool work, but the platform does not subtract or infer an unsupported standalone hosted-tool duration.
 
@@ -153,7 +175,7 @@ That distinction is deliberate. Total model-run latency may include hosted-tool 
 
 SDK trace IDs are retained for operational correlation. Prompts and outputs are not required for that correlation.
 
-The normal linkage is:
+The normal local linkage is:
 
 ```text
 work type
@@ -171,16 +193,14 @@ generation/tool span
 usage and timing facts
 ```
 
-Runtime Assurance consumes only aggregated telemetry. Model workers do not receive the telemetry database or raw span rows.
+The centralized record preserves trace ID, NHI, work type, graph/node context, and execution fingerprint but excludes the direct execution ID.
+
+Runtime Assurance consumes only aggregated telemetry. Model workers do not receive the telemetry database, CloudWatch event stream, or raw span rows.
 
 ## Failure behavior
 
-Telemetry is observational. A telemetry write failure cannot widen an agent's authority, bypass a graph evaluator, satisfy a human gate, or make an external action executable.
+Telemetry is observational. A local or AWS telemetry write failure cannot widen an agent's authority, bypass a graph evaluator, satisfy a human gate, or make an external action executable.
 
-If telemetry cannot be collected, governed model work may continue under the existing identity and graph controls, while Runtime Assurance reports the telemetry gap. Authority remains fail-closed even when observability is incomplete.
+If CloudWatch is unavailable, the local privacy-safe record may still complete. Governed model work can continue under the existing identity and graph controls, while Runtime Assurance reports the centralized coverage gap.
 
-## Production direction
-
-The production AWS design should preserve the same contract while moving storage and aggregation away from local SQLite. The likely target is centralized encrypted operational telemetry with CloudWatch/OpenTelemetry-compatible export, explicit retention, access controls, cost controls, and separate aggregate views for Runtime Assurance.
-
-That production step must preserve the current content boundary. More durable telemetry storage is not permission to capture prompts, learner submissions, model outputs, tool payloads, or credentials.
+Authority remains fail-closed even when observability is incomplete.
