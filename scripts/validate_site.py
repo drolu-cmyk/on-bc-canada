@@ -16,7 +16,6 @@ CANONICAL_PAGES = {
     "curriculum.html": "/curriculum",
     "enroll.html": "/enroll",
     "impact.html": "/impact",
-    "stories.html": "/stories",
     "contact.html": "/contact",
     "accessibility.html": "/accessibility",
     "support.html": "/support",
@@ -43,9 +42,9 @@ def main() -> int:
     pages = {path.name for path in SITE.glob("*.html")}
     errors.extend(f"missing page: site/{name}" for name in sorted(REQUIRED_PAGES - pages))
 
-    legacy_program = SITE / "program.html"
-    if legacy_program.exists():
-        errors.append("site/program.html must be retired in favour of /programs")
+    for retired in ("program.html", "stories.html"):
+        if (SITE / retired).exists():
+            errors.append(f"site/{retired} must be retired from the public architecture")
 
     for path in sorted(SITE.glob("*.html")):
         source = path.read_text(encoding="utf-8")
@@ -57,7 +56,11 @@ def main() -> int:
         if "<form" in source.lower():
             errors.append(f"{path}: live forms are not part of the public shell")
         if 'href="#main"' not in source:
-            errors.append(f"{path}: missing skip link")
+            errors.append(f"{path}: missing accessible skip link")
+
+        fragment_links = [target for target in re.findall(r'href="([^"]+)"', source) if "#" in target and target != "#main"]
+        if fragment_links:
+            errors.append(f"{path}: public navigation must not use fragment URLs: {', '.join(fragment_links)}")
 
         if path.name in CANONICAL_PAGES:
             route = CANONICAL_PAGES[path.name]
@@ -105,6 +108,8 @@ def main() -> int:
                 errors.append(f"site/sitemap.xml: missing {expected_url}")
         if ".html</loc>" in sitemap or "/index.html</loc>" in sitemap:
             errors.append("site/sitemap.xml: HTML filenames must not be canonical URLs")
+        if "/stories</loc>" in sitemap:
+            errors.append("site/sitemap.xml: placeholder Stories route must not be indexed")
         if "sozorock.ca" in sitemap:
             errors.append("site/sitemap.xml: legacy .ca hostname must not be indexed")
 
