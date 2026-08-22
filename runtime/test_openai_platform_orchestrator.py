@@ -9,7 +9,7 @@ from runtime.openai_platform_orchestrator import (
     PlatformRouteOutput,
     build_platform_orchestrator_agent,
 )
-from runtime.platform_harness import DispatchRequest, PlatformHarness
+from runtime.platform_graph_harness import DispatchRequest, PlatformGraphHarness
 
 
 class FakeAgent:
@@ -29,7 +29,7 @@ class FakeRunner:
 class OpenAIPlatformOrchestratorTests(unittest.TestCase):
     def test_typed_route_proposal_is_still_subject_to_deterministic_harness(self):
         output = PlatformRouteOutput(
-            workflow_key="employer_workforce",
+            work_type="employer_workforce",
             reason="The objective concerns an organization-level workflow and bounded AI adoption.",
             required_inputs=["aggregate workflow tasks"],
             risk_flags=[],
@@ -41,16 +41,16 @@ class OpenAIPlatformOrchestratorTests(unittest.TestCase):
                 objective="Assess whether an intake workflow has a justified AI opportunity.",
                 mode="analyze",
                 requested_effect="analysis",
-                declared_data_classes=("organization_aggregate",),
+                declared_data_classes=("organization_workflow", "aggregate_metrics"),
             )
         )
-        self.assertEqual("employer_workforce", proposal["workflow_key"])
-        decision = PlatformHarness().validate_dispatch(
+        self.assertEqual("employer_workforce", proposal["work_type"])
+        decision = PlatformGraphHarness().validate_dispatch(
             DispatchRequest(
-                proposal["workflow_key"],
+                proposal["work_type"],
                 "analyze",
                 "analysis",
-                ("organization_aggregate",),
+                ("organization_workflow", "aggregate_metrics"),
             )
         )
         self.assertTrue(decision.allowed)
@@ -59,7 +59,7 @@ class OpenAIPlatformOrchestratorTests(unittest.TestCase):
 
     def test_manager_cannot_make_forbidden_execution_allowed(self):
         output = PlatformRouteOutput(
-            workflow_key="product_change",
+            work_type="product_development",
             reason="The objective concerns product implementation.",
             required_inputs=[],
             risk_flags=["production action requested"],
@@ -70,22 +70,22 @@ class OpenAIPlatformOrchestratorTests(unittest.TestCase):
                 objective="Change the production product.",
                 mode="execute",
                 requested_effect="production_mutation",
-                declared_data_classes=("internal_operational",),
+                declared_data_classes=("operational",),
             )
         )
-        decision = PlatformHarness().validate_dispatch(
+        decision = PlatformGraphHarness().validate_dispatch(
             DispatchRequest(
-                proposal["workflow_key"],
+                proposal["work_type"],
                 "execute",
                 "production_mutation",
-                ("internal_operational",),
+                ("operational",),
             )
         )
         self.assertFalse(decision.allowed)
         self.assertIn("no current graph", decision.reason)
 
     def test_untyped_output_fails_closed(self):
-        orchestrator = OpenAIPlatformOrchestrator(agent=FakeAgent(), runner=FakeRunner({"workflow_key": "research_evidence"}))
+        orchestrator = OpenAIPlatformOrchestrator(agent=FakeAgent(), runner=FakeRunner({"work_type": "research_intelligence"}))
         with self.assertRaisesRegex(TypeError, "untyped"):
             orchestrator.propose(
                 OrchestrationEnvelope(
