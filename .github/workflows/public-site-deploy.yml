@@ -28,11 +28,8 @@ env:
   AWS_ACCOUNT_ID: "891377012881"
   AWS_REGION: ca-central-1
   CERTIFICATE_REGION: us-east-1
-  CANONICAL_ROOT_DOMAIN: sozorock.com
   CANONICAL_DOMAIN: canada.sozorock.com
   CANONICAL_DNS_ZONE: canada.sozorock.com
-  LEGACY_ROOT_DOMAIN: sozorock.ca
-  LEGACY_WWW_DOMAIN: www.sozorock.ca
   STACK_NAME: sozorock-ca-public-site
   PUBLIC_SITE_BUCKET_NAME: ${{ vars.PUBLIC_SITE_BUCKET_NAME || 'sozorock-ca-public-site-891377012881' }}
 
@@ -63,6 +60,7 @@ jobs:
       - name: Check deployment script syntax
         run: |
           bash -n scripts/deploy_public_site.sh
+          bash -n scripts/deploy_engagement_backend.sh
           bash -n scripts/deploy_legacy_ca_redirects.sh
           bash -n scripts/preflight_cloudfront_function.sh
 
@@ -89,11 +87,10 @@ jobs:
           AWS_ACCOUNT_ID: "891377012881"
           AWS_REGION: ca-central-1
           CERTIFICATE_REGION: us-east-1
-          CANONICAL_ROOT_DOMAIN: sozorock.com
           CANONICAL_DOMAIN: canada.sozorock.com
           CANONICAL_DNS_ZONE: canada.sozorock.com
-          LEGACY_ROOT_DOMAIN: sozorock.ca
-          LEGACY_WWW_DOMAIN: www.sozorock.ca
           STACK_NAME: sozorock-ca-public-site
           PUBLIC_SITE_BUCKET_NAME: ${{ vars.PUBLIC_SITE_BUCKET_NAME || 'sozorock-ca-public-site-891377012881' }}
+          ADMIN_EMAIL: "oluview@gmail.com"
+          NOTIFICATION_EMAIL: "oluview@gmail.com"
         run: bash scripts/deploy_public_site.sh
