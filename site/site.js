@@ -2,6 +2,8 @@
   const year = document.querySelector("[data-year]");
   if (year) year.textContent = new Date().getFullYear();
 
+  document.querySelectorAll(".footer-legal-note").forEach((note) => note.remove());
+
   const toggle = document.querySelector("[data-menu-toggle]");
   const nav = document.querySelector("[data-primary-nav]");
   if (!toggle || !nav) return;
