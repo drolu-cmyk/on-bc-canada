@@ -1,5 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
   <title id="title">SozoRock Canada</title>
-  <rect width="512" height="512" fill="#111111"/>
-  <text x="256" y="352" text-anchor="middle" fill="#ffffff" font-family="Georgia, 'Times New Roman', serif" font-size="350" font-weight="700">S</text>
+  <rect width="512" height="512" rx="88" fill="#c52a22"/>
+  <path d="M116 116h280v18H116z" fill="#ffffff" opacity=".95"/>
+  <text x="256" y="326" text-anchor="middle" fill="#ffffff" font-family="Georgia, 'Times New Roman', serif" font-size="220" font-weight="700" letter-spacing="-24">SR</text>
+  <path d="M116 378h280v18H116z" fill="#ffffff" opacity=".95"/>
 </svg>

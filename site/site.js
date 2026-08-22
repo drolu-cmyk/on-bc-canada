@@ -4,10 +4,10 @@
 
   const toggle = document.querySelector("[data-menu-toggle]");
   const nav = document.querySelector("[data-primary-nav]");
-
   if (!toggle || !nav) return;
 
-  const menuBreakpoint = document.body.classList.contains("reference-home") ? 860 : 760;
+  const usesReferenceShell = document.body.classList.contains("reference-home") || document.body.classList.contains("reference-page");
+  const menuBreakpoint = usesReferenceShell ? 860 : 760;
 
   const setMenuState = (open, returnFocus = false) => {
     toggle.setAttribute("aria-expanded", String(open));
@@ -22,14 +22,10 @@
     setMenuState(!open);
   });
 
-  nav.querySelectorAll("a").forEach((link) => {
-    link.addEventListener("click", () => setMenuState(false));
-  });
+  nav.querySelectorAll("a").forEach((link) => link.addEventListener("click", () => setMenuState(false)));
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && toggle.getAttribute("aria-expanded") === "true") {
-      setMenuState(false, true);
-    }
+    if (event.key === "Escape" && toggle.getAttribute("aria-expanded") === "true") setMenuState(false, true);
   });
 
   window.addEventListener("resize", () => {
