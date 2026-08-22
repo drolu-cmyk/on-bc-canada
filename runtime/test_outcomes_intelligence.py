@@ -45,6 +45,18 @@ class FakeOutcomesProvider:
 
 
 class OutcomesSnapshotTests(unittest.TestCase):
+    @staticmethod
+    def _all_keys(value) -> set[str]:
+        keys: set[str] = set()
+        if isinstance(value, dict):
+            for key, item in value.items():
+                keys.add(str(key))
+                keys.update(OutcomesSnapshotTests._all_keys(item))
+        elif isinstance(value, list):
+            for item in value:
+                keys.update(OutcomesSnapshotTests._all_keys(item))
+        return keys
+
     def _store(self, directory: str, *, learners: int) -> Path:
         path = Path(directory) / "learner.sqlite3"
         with sqlite3.connect(path) as connection:
@@ -112,11 +124,21 @@ class OutcomesSnapshotTests(unittest.TestCase):
         self.assertEqual(0.5, group["learners_with_accepted_capability_evidence"]["rate"])
         self.assertEqual(["capability-core"], [item["capability_id"] for item in group["capability_evidence_rates"]])
         self.assertEqual(1, group["suppressed_capability_metric_count"])
+        self.assertEqual("suppressed", group["submission_summary"]["status"])
+        self.assertEqual(1, group["suppressed_unit_status_metric_count"])
+        self.assertEqual(2, len(group["unit_status_rates"]))
+
         encoded = json.dumps(snapshot, sort_keys=True)
         self.assertNotIn("inst-", encoded)
-        self.assertNotIn("cohort_id", encoded)
-        self.assertNotIn("submission_id", encoded)
+        keys = self._all_keys(snapshot)
+        self.assertNotIn("instance_id", keys)
+        self.assertNotIn("cohort_id", keys)
+        self.assertNotIn("submission_id", keys)
+        self.assertNotIn("artifact_ref", keys)
+        self.assertNotIn("artifact_refs", keys)
+        self.assertNotIn("accepted_by", keys)
         self.assertFalse(snapshot["model_boundary"]["contains_direct_learner_identity"])
+        self.assertFalse(snapshot["model_boundary"]["contains_cohort_id"])
 
     def test_group_below_minimum_population_is_not_released(self):
         with tempfile.TemporaryDirectory() as directory:
