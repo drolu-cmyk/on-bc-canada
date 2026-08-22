@@ -39,6 +39,7 @@ The program publishes only claims supported by current records. Participation is
 - [Contribution and release rules](CONTRIBUTING.md)
 - [Program architecture](docs/program-architecture.md)
 - [Graph runtime](docs/graph-runtime.md)
+- [Platform Graph Harness](docs/platform-graph-harness.md)
 - [Canadian technical-work research graph](docs/research-graph.md)
 - [Work Intelligence Graph](docs/work-intelligence-graph.md)
 - [Learner Capability Graph](docs/capability-graph.md)
@@ -66,6 +67,7 @@ python scripts/validate_public_copy.py
 python scripts/validate_site.py
 python scripts/validate_deployment.py
 PYTHONPATH=compiler/src python -m unittest discover -s compiler/tests -v
+python -m runtime.run_platform_graph_harness validate
 python -m unittest discover -s runtime -p 'test_*.py' -v
 ```
 
