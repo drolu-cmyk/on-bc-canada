@@ -14,6 +14,7 @@ from typing import Any, Literal, Protocol
 from pydantic import BaseModel, Field
 
 from runtime.agent_identity_registry import ORCHESTRATOR_DATA, assert_agent_runtime_allowed
+from runtime.model_runtime_telemetry import install_model_runtime_telemetry, model_runtime_context
 from runtime.platform_graph_harness import DispatchMode
 
 
@@ -100,12 +101,14 @@ class OpenAIPlatformOrchestrator:
             requested_max_turns=self.max_turns,
             declared_model_data_classes=ORCHESTRATOR_DATA,
         )
+        install_model_runtime_telemetry()
         prompt = (
             "Select the first registered platform work type for this metadata-only orchestration envelope.\n\n"
             "INPUT_JSON\n"
             + json.dumps(envelope.as_payload(), ensure_ascii=False, sort_keys=True)
         )
-        result = self.runner.run_sync(self.agent, prompt, max_turns=self.max_turns)
+        with model_runtime_context(actor_id="platform-orchestrator-agent"):
+            result = self.runner.run_sync(self.agent, prompt, max_turns=self.max_turns)
         output = result.final_output
         if not isinstance(output, PlatformRouteOutput):
             raise TypeError("platform orchestrator returned untyped output")
