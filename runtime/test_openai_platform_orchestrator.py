@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import os
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
+from runtime.agent_identity_registry import DISABLED_AGENT_IDS_ENV
 from runtime.openai_platform_orchestrator import (
     OpenAIPlatformOrchestrator,
     OrchestrationEnvelope,
@@ -13,7 +16,9 @@ from runtime.platform_graph_harness import DispatchRequest, PlatformGraphHarness
 
 
 class FakeAgent:
-    name = "platform-orchestrator"
+    name = "Platform Orchestrator Agent"
+    tools = []
+    output_type = PlatformRouteOutput
 
 
 class FakeRunner:
@@ -83,6 +88,26 @@ class OpenAIPlatformOrchestratorTests(unittest.TestCase):
         )
         self.assertFalse(decision.allowed)
         self.assertIn("no current graph", decision.reason)
+
+    def test_disabled_manager_fails_before_runner_call(self):
+        runner = FakeRunner(
+            PlatformRouteOutput(
+                work_type="research_intelligence",
+                reason="fixture",
+            )
+        )
+        orchestrator = OpenAIPlatformOrchestrator(agent=FakeAgent(), runner=runner)
+        with patch.dict(os.environ, {DISABLED_AGENT_IDS_ENV: "platform-orchestrator-agent"}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "disabled"):
+                orchestrator.propose(
+                    OrchestrationEnvelope(
+                        objective="Research a technical-work signal.",
+                        mode="analyze",
+                        requested_effect="analysis",
+                        declared_data_classes=("public_research",),
+                    )
+                )
+        self.assertEqual([], runner.calls)
 
     def test_untyped_output_fails_closed(self):
         orchestrator = OpenAIPlatformOrchestrator(agent=FakeAgent(), runner=FakeRunner({"work_type": "research_intelligence"}))
