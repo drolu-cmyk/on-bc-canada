@@ -114,25 +114,31 @@ The only registered handoff is to Research Intelligence for independent validati
 
 The local reference store records trace linkage, NHI/actor/work-type correlation, graph and execution metadata where applicable, request and token usage, cached-input tokens, reasoning tokens, model-run latency, generation latency, local function/MCP tool-span latency, and optional reviewed pricing inputs.
 
-It does not store prompts, model output bodies, tool arguments, tool outputs, learner content, or credentials. Governed model execution sets `OPENAI_AGENTS_TRACE_INCLUDE_SENSITIVE_DATA=0` before the SDK run.
+It does not store prompts, model output bodies, tool arguments, tool outputs, learner content, or credentials. Governed model execution disables sensitive SDK trace capture and model/tool payload logging before the SDK run.
 
 The default local telemetry database is `local-data/model-telemetry.sqlite3`. Override it with `SOZOROCK_MODEL_TELEMETRY_DB`.
 
+When `SOZOROCK_AWS_OBSERVABILITY_ENABLED=1`, `aws_runtime_observability.py` also exports one strict completed-trace summary to the precreated KMS-encrypted CloudWatch Logs stream. The direct execution ID remains local; centralized telemetry receives only the one-way execution fingerprint.
+
+The centralized event uses Embedded Metric Format with `Environment` as its only CloudWatch metric dimension. Work type, graph, node, NHI, and trace identifiers remain log properties to avoid high-cardinality metric series.
+
 Model cost is not hardcoded. Optional reviewed rates may be supplied with `SOZOROCK_MODEL_PRICING_JSON`; otherwise Runtime Assurance keeps token counts and reports monetary-cost coverage as unavailable.
 
-OpenAI-hosted web-search duration is not isolated as a standalone metric in this release when the SDK does not expose it as an independently attributable local tool span.
+OpenAI-hosted web-search duration is not isolated as a standalone metric when the SDK does not expose it as an independently attributable local tool span.
 
 ## Runtime Assurance graph
 
-`runtime_assurance.py` creates aggregate operational telemetry from the durable generic graph store, ResearchStore, and model runtime telemetry store.
+`runtime_assurance.py` creates aggregate operational telemetry from the durable generic graph store, ResearchStore, and one model-runtime telemetry source.
 
-It reports execution status, graph versions, node completion, human-review state, coarse failure categories, event counts, source coverage, model requests, token usage, cached and reasoning tokens, trace counts, model-run latency, generation latency, local function/MCP tool latency, and pricing coverage when those measurements exist.
+The model-runtime source can be local SQLite or centralized CloudWatch Logs. `run_runtime_assurance.py` selects the source with `--telemetry-source local|aws` and uses AWS automatically when centralized observability is explicitly enabled in the environment.
 
-Missing measurements remain explicit. An absent telemetry database, missing reviewed pricing, or unavailable hosted-tool timing is not treated as healthy operation.
+Runtime Assurance reports execution status, graph versions, node completion, human-review state, coarse failure categories, event counts, source coverage, model requests, token usage, cached and reasoning tokens, trace counts, model-run latency, generation latency, local function/MCP tool latency, and pricing coverage when those measurements exist.
+
+Missing measurements remain explicit. An absent telemetry source, missing reviewed pricing, or unavailable hosted-tool timing is not treated as healthy operation.
 
 `runtime_assurance_graph.py` runs Runtime Reliability Agent and Runtime Control Agent. Both are tool-free A1 workers. They may recommend human investigation or prepare a Product Development remediation problem. They cannot disable agents, change authority or tools, change runtime limits, deploy code, mutate infrastructure, or alter production.
 
-`runtime_assurance_runner.py` and `run_runtime_assurance.py` provide durable start/status operations. `run_runtime_assurance.py` accepts `--telemetry-db` for the model telemetry store.
+`runtime_assurance_runner.py` and `run_runtime_assurance.py` provide durable start/status operations.
 
 ## Agent identity and runtime policy
 
@@ -163,10 +169,20 @@ python -m runtime.run_outcomes_intelligence start \
   --pathway-id applied-ai-systems
 ```
 
-Run aggregate autonomous-platform assurance:
+Run aggregate autonomous-platform assurance with local telemetry:
 
 ```bash
-python -m runtime.run_runtime_assurance start
+python -m runtime.run_runtime_assurance \
+  --telemetry-source local \
+  start
+```
+
+Run it against centralized AWS telemetry:
+
+```bash
+python -m runtime.run_runtime_assurance \
+  --telemetry-source aws \
+  start
 ```
 
 Read stored workflow status without a model call using the corresponding `status --execution-id` command.
@@ -177,4 +193,4 @@ Run the tests from the repository root:
 python -m unittest discover -s runtime -p 'test_*.py' -v
 ```
 
-The test suite does not make live model calls. It checks graph execution, persistence, stop-and-resume behavior, research specialization, Work Intelligence, Capability and Learning Graph authority, Product Development release authority, Business Operations A3/A4 routing, Learner Execution privacy, outcomes cell suppression, model runtime telemetry privacy and aggregation, Runtime Assurance telemetry boundaries, cross-graph handoffs, agent identity/tool contracts, runtime budgets, command boundaries, and installed SDK construction.
+The test suite does not make live model calls. It checks graph execution, persistence, stop-and-resume behavior, research specialization, Work Intelligence, Capability and Learning Graph authority, Product Development release authority, Business Operations A3/A4 routing, Learner Execution privacy, outcomes cell suppression, local and AWS model runtime telemetry privacy and aggregation, Runtime Assurance telemetry boundaries, cross-graph handoffs, agent identity/tool contracts, runtime budgets, command boundaries, and installed SDK construction.
