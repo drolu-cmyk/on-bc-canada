@@ -106,6 +106,9 @@ class CapabilityDraft:
             raise ValueError(f"unsupported target level: {self.target_level}")
         if not self.evidence_standards:
             raise ValueError("a capability requires at least one evidence standard")
+        standard_ids = [item.standard_id for item in self.evidence_standards]
+        if len(set(standard_ids)) != len(standard_ids):
+            raise ValueError("duplicate evidence standard IDs are not allowed")
         if not self.provenance:
             raise ValueError("a capability draft requires Work Intelligence provenance")
         if self.capability_id in self.prerequisite_ids:
@@ -212,6 +215,9 @@ class CapabilityGraphStore:
         capability = work_store.find_entity("capability", capability_name)
         if pathway is None or capability is None:
             raise ValueError("capability is not supported by the Work Intelligence Graph")
+        stored_pathway_id = (pathway.get("metadata") or {}).get("pathway_id")
+        if stored_pathway_id and stored_pathway_id != pathway_id:
+            raise ValueError("pathway ID does not match the Work Intelligence pathway record")
 
         matching = [
             relation
