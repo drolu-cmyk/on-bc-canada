@@ -1,0 +1,352 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Durable encrypted execution state, work delivery, and bounded platform events for SozoRock Canada governed graphs.",
+  "Parameters": {
+    "EnvironmentName": {
+      "Type": "String",
+      "Default": "pilot",
+      "AllowedPattern": "^[a-z0-9-]{2,32}$"
+    },
+    "ExecutionTableName": {
+      "Type": "String",
+      "Default": "sozorock-ca-graph-executions"
+    },
+    "AlarmEmail": {
+      "Type": "String",
+      "Default": ""
+    },
+    "MaxReceiveCount": {
+      "Type": "Number",
+      "Default": 5,
+      "MinValue": 2,
+      "MaxValue": 10
+    }
+  },
+  "Conditions": {
+    "AlarmNotificationsEnabled": {
+      "Fn::Not": [
+        {"Fn::Equals": [{"Ref": "AlarmEmail"}, ""]}
+      ]
+    }
+  },
+  "Resources": {
+    "DurableExecutionKey": {
+      "Type": "AWS::KMS::Key",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "Description": "Encrypt SozoRock Canada durable graph execution state and work queues.",
+        "EnableKeyRotation": true,
+        "KeyPolicy": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "EnableAccountAdministration",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {"Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"}
+              },
+              "Action": "kms:*",
+              "Resource": "*"
+            }
+          ]
+        },
+        "Tags": [
+          {"Key": "Project", "Value": "SozoRockCanada"},
+          {"Key": "Environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "DataClass", "Value": "controlled-runtime-state"}
+        ]
+      }
+    },
+    "DurableExecutionKeyAlias": {
+      "Type": "AWS::KMS::Alias",
+      "Properties": {
+        "AliasName": {"Fn::Sub": "alias/sozorock-canada-${EnvironmentName}-durable-execution"},
+        "TargetKeyId": {"Ref": "DurableExecutionKey"}
+      }
+    },
+    "ExecutionTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "TableName": {"Ref": "ExecutionTableName"},
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {"AttributeName": "pk", "AttributeType": "S"},
+          {"AttributeName": "sk", "AttributeType": "S"},
+          {"AttributeName": "updated_at", "AttributeType": "S"}
+        ],
+        "KeySchema": [
+          {"AttributeName": "pk", "KeyType": "HASH"},
+          {"AttributeName": "sk", "KeyType": "RANGE"}
+        ],
+        "GlobalSecondaryIndexes": [
+          {
+            "IndexName": "ExecutionUpdatedIndex",
+            "KeySchema": [
+              {"AttributeName": "sk", "KeyType": "HASH"},
+              {"AttributeName": "updated_at", "KeyType": "RANGE"}
+            ],
+            "Projection": {
+              "ProjectionType": "INCLUDE",
+              "NonKeyAttributes": [
+                "graph_id",
+                "graph_version",
+                "status",
+                "failure",
+                "history_json",
+                "pending_approval_json",
+                "events_json"
+              ]
+            }
+          }
+        ],
+        "DeletionProtectionEnabled": true,
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true,
+          "RecoveryPeriodInDays": 35
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS",
+          "KMSMasterKeyId": {"Fn::GetAtt": ["DurableExecutionKey", "Arn"]}
+        },
+        "TimeToLiveSpecification": {
+          "AttributeName": "expires_at_epoch",
+          "Enabled": true
+        },
+        "Tags": [
+          {"Key": "Project", "Value": "SozoRockCanada"},
+          {"Key": "Environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "DataClass", "Value": "controlled-runtime-state"}
+        ]
+      }
+    },
+    "WorkDeadLetterQueue": {
+      "Type": "AWS::SQS::Queue",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "QueueName": {"Fn::Sub": "sozorock-ca-${EnvironmentName}-graph-work-dlq.fifo"},
+        "FifoQueue": true,
+        "ContentBasedDeduplication": false,
+        "MessageRetentionPeriod": 1209600,
+        "ReceiveMessageWaitTimeSeconds": 20,
+        "KmsMasterKeyId": {"Fn::GetAtt": ["DurableExecutionKey", "Arn"]},
+        "KmsDataKeyReusePeriodSeconds": 300,
+        "Tags": [
+          {"Key": "Project", "Value": "SozoRockCanada"},
+          {"Key": "Environment", "Value": {"Ref": "EnvironmentName"}}
+        ]
+      }
+    },
+    "WorkQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": {"Fn::Sub": "sozorock-ca-${EnvironmentName}-graph-work.fifo"},
+        "FifoQueue": true,
+        "ContentBasedDeduplication": false,
+        "VisibilityTimeout": 120,
+        "MessageRetentionPeriod": 1209600,
+        "ReceiveMessageWaitTimeSeconds": 20,
+        "KmsMasterKeyId": {"Fn::GetAtt": ["DurableExecutionKey", "Arn"]},
+        "KmsDataKeyReusePeriodSeconds": 300,
+        "RedrivePolicy": {
+          "deadLetterTargetArn": {"Fn::GetAtt": ["WorkDeadLetterQueue", "Arn"]},
+          "maxReceiveCount": {"Ref": "MaxReceiveCount"}
+        },
+        "Tags": [
+          {"Key": "Project", "Value": "SozoRockCanada"},
+          {"Key": "Environment", "Value": {"Ref": "EnvironmentName"}}
+        ]
+      }
+    },
+    "PlatformEventBus": {
+      "Type": "AWS::Events::EventBus",
+      "Properties": {
+        "Name": {"Fn::Sub": "sozorock-ca-${EnvironmentName}-platform-events"},
+        "Description": "Bounded execution-pointer events; raw learner and graph state is not permitted.",
+        "Tags": [
+          {"Key": "Project", "Value": "SozoRockCanada"},
+          {"Key": "Environment", "Value": {"Ref": "EnvironmentName"}}
+        ]
+      }
+    },
+    "DurableExecutionStatePolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "Description": "Read and conditionally update governed graph execution state in the Canada durable table.",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "ExecutionState",
+              "Effect": "Allow",
+              "Action": [
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:Query"
+              ],
+              "Resource": [
+                {"Fn::GetAtt": ["ExecutionTable", "Arn"]},
+                {"Fn::Sub": "${ExecutionTable.Arn}/index/ExecutionUpdatedIndex"}
+              ]
+            },
+            {
+              "Sid": "ExecutionKms",
+              "Effect": "Allow",
+              "Action": ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"],
+              "Resource": {"Fn::GetAtt": ["DurableExecutionKey", "Arn"]}
+            }
+          ]
+        }
+      }
+    },
+    "DurableWorkProducerPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "Description": "Persist a bounded work command and enqueue only its non-sensitive pointer.",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "PersistCommand",
+              "Effect": "Allow",
+              "Action": ["dynamodb:GetItem", "dynamodb:PutItem"],
+              "Resource": {"Fn::GetAtt": ["ExecutionTable", "Arn"]}
+            },
+            {
+              "Sid": "EnqueuePointer",
+              "Effect": "Allow",
+              "Action": "sqs:SendMessage",
+              "Resource": {"Fn::GetAtt": ["WorkQueue", "Arn"]}
+            },
+            {
+              "Sid": "ProducerKms",
+              "Effect": "Allow",
+              "Action": ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"],
+              "Resource": {"Fn::GetAtt": ["DurableExecutionKey", "Arn"]}
+            }
+          ]
+        }
+      }
+    },
+    "DurableWorkConsumerPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "Description": "Consume pointer-only work, load encrypted command state, maintain leases, and emit bounded platform events.",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "ConsumeWork",
+              "Effect": "Allow",
+              "Action": [
+                "sqs:ReceiveMessage",
+                "sqs:DeleteMessage",
+                "sqs:ChangeMessageVisibility",
+                "sqs:GetQueueAttributes"
+              ],
+              "Resource": {"Fn::GetAtt": ["WorkQueue", "Arn"]}
+            },
+            {
+              "Sid": "ReadAndUpdateCommand",
+              "Effect": "Allow",
+              "Action": ["dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Query"],
+              "Resource": [
+                {"Fn::GetAtt": ["ExecutionTable", "Arn"]},
+                {"Fn::Sub": "${ExecutionTable.Arn}/index/ExecutionUpdatedIndex"}
+              ]
+            },
+            {
+              "Sid": "PublishBoundedPlatformEvents",
+              "Effect": "Allow",
+              "Action": "events:PutEvents",
+              "Resource": {"Fn::GetAtt": ["PlatformEventBus", "Arn"]}
+            },
+            {
+              "Sid": "ConsumerKms",
+              "Effect": "Allow",
+              "Action": ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"],
+              "Resource": {"Fn::GetAtt": ["DurableExecutionKey", "Arn"]}
+            }
+          ]
+        }
+      }
+    },
+    "DurableExecutionAlarmTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "DisplayName": "SozoRock Canada Durable Execution",
+        "KmsMasterKeyId": "alias/aws/sns",
+        "Tags": [
+          {"Key": "Project", "Value": "SozoRockCanada"},
+          {"Key": "Environment", "Value": {"Ref": "EnvironmentName"}}
+        ]
+      }
+    },
+    "DurableExecutionAlarmSubscription": {
+      "Type": "AWS::SNS::Subscription",
+      "Condition": "AlarmNotificationsEnabled",
+      "Properties": {
+        "Protocol": "email",
+        "Endpoint": {"Ref": "AlarmEmail"},
+        "TopicArn": {"Ref": "DurableExecutionAlarmTopic"}
+      }
+    },
+    "DeadLetterQueueAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "At least one governed graph work item reached the durable execution dead-letter queue.",
+        "Namespace": "AWS/SQS",
+        "MetricName": "ApproximateNumberOfMessagesVisible",
+        "Dimensions": [
+          {"Name": "QueueName", "Value": {"Fn::GetAtt": ["WorkDeadLetterQueue", "QueueName"]}}
+        ],
+        "Statistic": "Maximum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "DatapointsToAlarm": 1,
+        "Threshold": 1,
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": {"Fn::If": ["AlarmNotificationsEnabled", [{"Ref": "DurableExecutionAlarmTopic"}], {"Ref": "AWS::NoValue"}]}
+      }
+    },
+    "WorkQueueAgeAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "Oldest governed work item has remained on the execution queue for at least fifteen minutes.",
+        "Namespace": "AWS/SQS",
+        "MetricName": "ApproximateAgeOfOldestMessage",
+        "Dimensions": [
+          {"Name": "QueueName", "Value": {"Fn::GetAtt": ["WorkQueue", "QueueName"]}}
+        ],
+        "Statistic": "Maximum",
+        "Period": 300,
+        "EvaluationPeriods": 3,
+        "DatapointsToAlarm": 3,
+        "Threshold": 900,
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": {"Fn::If": ["AlarmNotificationsEnabled", [{"Ref": "DurableExecutionAlarmTopic"}], {"Ref": "AWS::NoValue"}]}
+      }
+    }
+  },
+  "Outputs": {
+    "DurableExecutionKmsKeyArn": {"Value": {"Fn::GetAtt": ["DurableExecutionKey", "Arn"]}},
+    "ExecutionTableName": {"Value": {"Ref": "ExecutionTable"}},
+    "ExecutionTableArn": {"Value": {"Fn::GetAtt": ["ExecutionTable", "Arn"]}},
+    "WorkQueueUrl": {"Value": {"Ref": "WorkQueue"}},
+    "WorkQueueArn": {"Value": {"Fn::GetAtt": ["WorkQueue", "Arn"]}},
+    "DeadLetterQueueArn": {"Value": {"Fn::GetAtt": ["WorkDeadLetterQueue", "Arn"]}},
+    "PlatformEventBusName": {"Value": {"Ref": "PlatformEventBus"}},
+    "PlatformEventBusArn": {"Value": {"Fn::GetAtt": ["PlatformEventBus", "Arn"]}},
+    "ExecutionStatePolicyArn": {"Value": {"Ref": "DurableExecutionStatePolicy"}},
+    "WorkProducerPolicyArn": {"Value": {"Ref": "DurableWorkProducerPolicy"}},
+    "WorkConsumerPolicyArn": {"Value": {"Ref": "DurableWorkConsumerPolicy"}},
+    "AlarmTopicArn": {"Value": {"Ref": "DurableExecutionAlarmTopic"}}
+  }
+}
