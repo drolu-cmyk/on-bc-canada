@@ -67,6 +67,24 @@ A mission is the only unit type that can carry final capability evidence require
 
 `run_learning_graph.py` provides command operations for agent-assisted design, activation, retirement, inspection, and active-path lookup. Only one learning-path version may be active for a pathway at a time.
 
+## Product Development graph
+
+`product_development_graph.py` coordinates Product, Experience, UI Design, Copy, Brand, Engineering, Cloud, Security, Accessibility, and Quality agents through one versioned graph. Every specialist agent is A1 and has no production tool in this graph.
+
+Deterministic release assurance reads the structured copy, brand, cloud, security, accessibility, and quality reviews. Any release blocker routes directly to a blocked terminal record. A packet with no blocker stops at an A3 human release gate. Approval creates an `authorized_for_implementation` record; it does not deploy, merge code, publish copy, or mutate infrastructure.
+
+`product_development_store.py`, `product_development_runner.py`, and `run_product_development.py` provide durable stop-and-resume state and command operations.
+
+## Business Operations graph
+
+`business_operations_graph.py` routes explicit requests to Growth, Marketing, Partnerships, Operations, or Finance. The workstream is selected by deterministic request validation rather than model classification.
+
+Analysis and preparation can finish directly when no blocker exists. External publication and external contact stop at A3. Financial commitment is restricted to Finance and stops at A4. Authorization is separate from execution.
+
+`openai_business_operations_provider.py` supplies typed, tool-free workers. Growth focuses on funnel evidence and experiments. Marketing separates supported proof from claims that still need evidence. Partnerships evaluates mutual value and qualification. Operations separates deterministic automation from judgment and records data boundaries. Finance uses supplied numeric inputs, surfaces assumptions, and cannot move money or approve spend.
+
+`graph_execution_store.py` is the first generic durable graph-state store. `business_operations_runner.py` and `run_business_operations.py` use it so A3/A4 work can survive a restart without regenerating specialist analysis.
+
 Install the agent runtime dependencies before live agent use:
 
 ```bash
@@ -107,4 +125,4 @@ Run the tests from the repository root:
 python -m unittest discover -s runtime -p 'test_*.py' -v
 ```
 
-The test suite does not make live model calls. It checks graph execution, persistence, stop-and-resume behavior, domain specialization, provider contracts, Work Intelligence, Capability Graph authority, Learning Graph sequence and evidence rules, command boundaries, and installed SDK construction.
+The test suite does not make live model calls. It checks graph execution, persistence, stop-and-resume behavior, domain specialization, provider contracts, Work Intelligence, Capability Graph authority, Learning Graph sequence and evidence rules, Product Development release authority, Business Operations A3/A4 routing, command boundaries, and installed SDK construction.
