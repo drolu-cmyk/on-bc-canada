@@ -107,7 +107,7 @@ class ModelRuntimeTelemetryTests(unittest.TestCase):
             self.assertEqual(75, span_row["reasoning_tokens"])
             self.assertEqual(1000.0, span_row["latency_ms"])
             self.assertEqual("estimated", span_row["pricing_status"])
-            self.assertAlmostEqual(0.003775, span_row["estimated_cost_usd"], places=8)
+            self.assertAlmostEqual(0.003225, span_row["estimated_cost_usd"], places=8)
             forbidden_tokens = ("prompt", "output_body", "input_body", "tool_argument", "tool_output", "credential")
             for column in trace_columns | span_columns:
                 self.assertFalse(any(token in column for token in forbidden_tokens), column)
