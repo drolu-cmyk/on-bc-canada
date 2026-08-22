@@ -8,8 +8,7 @@
   const nav = document.querySelector("[data-primary-nav]");
   if (!toggle || !nav) return;
 
-  const usesReferenceShell = document.body.classList.contains("reference-home") || document.body.classList.contains("reference-page");
-  const menuBreakpoint = usesReferenceShell ? 860 : 760;
+  const menuBreakpoint = 760;
 
   const setMenuState = (open, returnFocus = false) => {
     toggle.setAttribute("aria-expanded", String(open));
