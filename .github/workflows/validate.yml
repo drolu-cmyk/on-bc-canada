@@ -29,6 +29,8 @@ jobs:
         run: python scripts/validate_deployment.py
       - name: Run deterministic curriculum compiler tests
         run: PYTHONPATH=compiler/src python -m unittest discover -s compiler/tests -v
+      - name: Validate graph authority contracts
+        run: python -m runtime.run_platform_graph_harness validate
       - name: Run runtime and graph tests
         run: python -m unittest discover -s runtime -p 'test_*.py' -v
       - name: Build and validate a release manifest
