@@ -27,6 +27,16 @@ The graph kernel does not call a model by itself. Agent providers are injected t
 
 `openai_research_provider.py` supplies the first live reasoning workers using the OpenAI Agents SDK. Workers use typed Pydantic outputs. Only source discovery, evidence verification, technology verification, and contradiction review receive hosted web-search access. Confidence scoring remains deterministic code.
 
+## Research domains
+
+`research_domain_packs.py` defines the three launch research domains:
+
+- `applied-ai-systems`
+- `cybersecurity-grc`
+- `ai-governance-assurance`
+
+Each pack supplies its own research goal, source priorities, evidence rules, capability focus, technology focus, and contradiction tests. These values travel inside the research state so every specialist worker receives the same domain boundary. Domain packs guide evidence gathering and interpretation; they do not bypass the graph's evaluators or human curriculum gate.
+
 ## Durable research state
 
 `research_store.py` persists one graph execution to SQLite, including state, checkpoints, human-review state, failure state, and the hash-chained event ledger. This is workflow memory, not semantic learner memory. It allows a process to stop at a human gate and resume later without rerunning completed research nodes.
@@ -43,12 +53,15 @@ python -m pip install -r runtime/requirements-agentic.txt
 
 A live run additionally requires `OPENAI_API_KEY`. Secrets do not belong in the repository.
 
-Start research:
+Start research inside one launch domain:
 
 ```bash
 python -m runtime.run_research start \
+  --domain applied-ai-systems \
   --question "What capabilities are Canadian employers asking Applied AI practitioners to demonstrate?"
 ```
+
+Use `cybersecurity-grc` or `ai-governance-assurance` for the other launch pathways.
 
 If the graph reaches the curriculum gate, the command returns the execution ID and approval state. Review the stored evidence, then resume with an accountable human decision:
 
@@ -72,4 +85,4 @@ Run the tests from the repository root:
 python -m unittest discover -s runtime -p 'test_*.py' -v
 ```
 
-The test suite does not make live model calls. It checks graph execution, persistence, stop-and-resume behavior, provider contracts, command boundaries, and installed SDK construction.
+The test suite does not make live model calls. It checks graph execution, persistence, stop-and-resume behavior, domain specialization, provider contracts, command boundaries, and installed SDK construction.
