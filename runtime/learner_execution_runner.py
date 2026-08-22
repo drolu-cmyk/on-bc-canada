@@ -50,6 +50,12 @@ def start_learner_assessment(
     )
     graph.register()
     _, execution = graph.start(execution_id=execution_id, submission_id=submission_id)
+    if execution.status == "failed":
+        progress_store.set_submission_assessment_state(
+            submission_id,
+            status="submitted",
+            assessment_execution_id=execution_id,
+        )
     execution_store.save_execution(
         execution,
         kernel.ledger,
