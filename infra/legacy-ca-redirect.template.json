@@ -1,0 +1,133 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Regional HTTPS 301 redirects from legacy SozoRock .ca domains to canada.sozorock.com.",
+  "Parameters": {
+    "LegacyHostedZoneId": {"Type": "String", "Default": "Z081121934QL55XA4WUZ"},
+    "LegacyRootDomainName": {"Type": "String", "Default": "sozorock.ca"},
+    "LegacyWwwDomainName": {"Type": "String", "Default": "www.sozorock.ca"},
+    "CanonicalOrigin": {"Type": "String", "Default": "https://canada.sozorock.com"}
+  },
+  "Resources": {
+    "RedirectCertificate": {
+      "Type": "AWS::CertificateManager::Certificate",
+      "Properties": {
+        "DomainName": {"Ref": "LegacyRootDomainName"},
+        "SubjectAlternativeNames": [{"Ref": "LegacyWwwDomainName"}],
+        "ValidationMethod": "DNS",
+        "DomainValidationOptions": [
+          {"DomainName": {"Ref": "LegacyRootDomainName"}, "HostedZoneId": {"Ref": "LegacyHostedZoneId"}},
+          {"DomainName": {"Ref": "LegacyWwwDomainName"}, "HostedZoneId": {"Ref": "LegacyHostedZoneId"}}
+        ]
+      }
+    },
+    "RedirectFunctionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [{"Effect": "Allow", "Principal": {"Service": "lambda.amazonaws.com"}, "Action": "sts:AssumeRole"}]
+        },
+        "Policies": [{
+          "PolicyName": "RedirectFunctionLogs",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [{
+              "Effect": "Allow",
+              "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+              "Resource": {"Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*"}
+            }]
+          }
+        }]
+      }
+    },
+    "RedirectFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Runtime": "nodejs22.x",
+        "Handler": "index.handler",
+        "Role": {"Fn::GetAtt": ["RedirectFunctionRole", "Arn"]},
+        "Timeout": 3,
+        "MemorySize": 128,
+        "Environment": {"Variables": {"CANONICAL_ORIGIN": {"Ref": "CanonicalOrigin"}}},
+        "Code": {
+          "ZipFile": "exports.handler = async (event) => {\n  const origin = process.env.CANONICAL_ORIGIN;\n  const path = event.rawPath || '/';\n  const query = event.rawQueryString ? `?${event.rawQueryString}` : '';\n  return {\n    statusCode: 301,\n    headers: { location: `${origin}${path}${query}`, 'cache-control': 'public, max-age=3600' }\n  };\n};\n"
+        }
+      }
+    },
+    "RedirectApi": {
+      "Type": "AWS::ApiGatewayV2::Api",
+      "Properties": {"Name": "sozorock-ca-legacy-redirect", "ProtocolType": "HTTP", "IpAddressType": "dualstack"}
+    },
+    "RedirectIntegration": {
+      "Type": "AWS::ApiGatewayV2::Integration",
+      "Properties": {
+        "ApiId": {"Ref": "RedirectApi"},
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {"Fn::GetAtt": ["RedirectFunction", "Arn"]},
+        "PayloadFormatVersion": "2.0"
+      }
+    },
+    "RedirectRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {"Ref": "RedirectApi"},
+        "RouteKey": "$default",
+        "Target": {"Fn::Join": ["/", ["integrations", {"Ref": "RedirectIntegration"}]]}
+      }
+    },
+    "RedirectStage": {
+      "Type": "AWS::ApiGatewayV2::Stage",
+      "Properties": {"ApiId": {"Ref": "RedirectApi"}, "StageName": "$default", "AutoDeploy": true}
+    },
+    "RedirectInvokePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {"Ref": "RedirectFunction"},
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {"Fn::Sub": "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${RedirectApi}/*"}
+      }
+    },
+    "RootDomain": {
+      "Type": "AWS::ApiGatewayV2::DomainName",
+      "Properties": {
+        "DomainName": {"Ref": "LegacyRootDomainName"},
+        "DomainNameConfigurations": [{
+          "CertificateArn": {"Ref": "RedirectCertificate"},
+          "EndpointType": "REGIONAL",
+          "SecurityPolicy": "TLS_1_2",
+          "IpAddressType": "dualstack"
+        }]
+      }
+    },
+    "WwwDomain": {
+      "Type": "AWS::ApiGatewayV2::DomainName",
+      "Properties": {
+        "DomainName": {"Ref": "LegacyWwwDomainName"},
+        "DomainNameConfigurations": [{
+          "CertificateArn": {"Ref": "RedirectCertificate"},
+          "EndpointType": "REGIONAL",
+          "SecurityPolicy": "TLS_1_2",
+          "IpAddressType": "dualstack"
+        }]
+      }
+    },
+    "RootMapping": {
+      "Type": "AWS::ApiGatewayV2::ApiMapping",
+      "DependsOn": "RedirectStage",
+      "Properties": {"ApiId": {"Ref": "RedirectApi"}, "DomainName": {"Ref": "RootDomain"}, "Stage": {"Ref": "RedirectStage"}}
+    },
+    "WwwMapping": {
+      "Type": "AWS::ApiGatewayV2::ApiMapping",
+      "DependsOn": "RedirectStage",
+      "Properties": {"ApiId": {"Ref": "RedirectApi"}, "DomainName": {"Ref": "WwwDomain"}, "Stage": {"Ref": "RedirectStage"}}
+    }
+  },
+  "Outputs": {
+    "RootRegionalDomainName": {"Value": {"Fn::GetAtt": ["RootDomain", "RegionalDomainName"]}},
+    "RootRegionalHostedZoneId": {"Value": {"Fn::GetAtt": ["RootDomain", "RegionalHostedZoneId"]}},
+    "WwwRegionalDomainName": {"Value": {"Fn::GetAtt": ["WwwDomain", "RegionalDomainName"]}},
+    "WwwRegionalHostedZoneId": {"Value": {"Fn::GetAtt": ["WwwDomain", "RegionalHostedZoneId"]}},
+    "CanonicalOrigin": {"Value": {"Ref": "CanonicalOrigin"}}
+  }
+}

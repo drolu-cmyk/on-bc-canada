@@ -54,6 +54,8 @@ jobs:
         run: python scripts/validate_site.py
       - name: Validate deployment
         run: python scripts/validate_deployment.py
+      - name: Validate legacy redirects
+        run: python scripts/validate_legacy_redirect.py
       - name: Run compiler tests
         run: PYTHONPATH=compiler/src python -m unittest discover -s compiler/tests -v
       - name: Run runtime tests
@@ -61,6 +63,7 @@ jobs:
       - name: Check deployment script syntax
         run: |
           bash -n scripts/deploy_public_site.sh
+          bash -n scripts/deploy_legacy_ca_redirects.sh
           bash -n scripts/preflight_cloudfront_function.sh
 
   deploy:
