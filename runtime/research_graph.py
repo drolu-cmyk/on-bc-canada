@@ -1,8 +1,8 @@
-"""First research graph for Canadian technical-work evidence.
+"""Research graph for Canadian technical-work evidence.
 
-The runtime is provider-neutral. Discovery, extraction, challenge, and scoring
-handlers are injected so OpenAI agents, deterministic services, or future
-providers can occupy the same graph without changing its authority model.
+The graph owns sequencing and authority. Specialist providers occupy selected
+nodes, but no model worker can bypass the graph's evaluation or human-review
+boundaries.
 """
 from __future__ import annotations
 
@@ -16,7 +16,15 @@ class ResearchProvider(Protocol):
     def normalize(self, question: str) -> dict[str, Any]: ...
     def discover(self, research: dict[str, Any]) -> list[dict[str, Any]]: ...
     def collect(self, research: dict[str, Any], sources: list[dict[str, Any]]) -> list[dict[str, Any]]: ...
-    def extract_capabilities(self, research: dict[str, Any], evidence: list[dict[str, Any]]) -> list[dict[str, Any]]: ...
+    def analyze_labour_market(self, research: dict[str, Any], evidence: list[dict[str, Any]]) -> dict[str, Any]: ...
+    def analyze_technology(self, research: dict[str, Any], evidence: list[dict[str, Any]]) -> dict[str, Any]: ...
+    def extract_capabilities(
+        self,
+        research: dict[str, Any],
+        evidence: list[dict[str, Any]],
+        labour_market: dict[str, Any],
+        technology: dict[str, Any],
+    ) -> list[dict[str, Any]]: ...
     def challenge(
         self,
         research: dict[str, Any],
@@ -52,16 +60,38 @@ class ResearchGraph:
 
         return GraphDefinition(
             graph_id="canadian-work-research",
-            version="0.1.0",
+            version="0.2.0",
             start_node="normalize_question",
             nodes=(
                 GraphNode("normalize_question", service("research-contract"), "research.normalize", "research.normalized"),
-                GraphNode("discover_sources", agent("research-discovery-agent"), "research.discover", "research.sources"),
+                GraphNode("discover_sources", agent("research-director-agent"), "research.discover", "research.sources"),
                 GraphNode("collect_evidence", agent("evidence-agent"), "research.collect", "research.evidence"),
-                GraphNode("extract_capabilities", agent("skills-agent"), "research.extract_capabilities", "research.capabilities"),
+                GraphNode(
+                    "analyse_labour_market",
+                    agent("labour-market-agent"),
+                    "research.labour_market",
+                    "research.labour_market",
+                ),
+                GraphNode(
+                    "analyse_technology",
+                    agent("technology-agent"),
+                    "research.technology",
+                    "research.technology",
+                ),
+                GraphNode(
+                    "extract_capabilities",
+                    agent("skills-agent"),
+                    "research.extract_capabilities",
+                    "research.capabilities",
+                ),
                 GraphNode("challenge_conclusion", agent("contradiction-agent"), "research.challenge", "research.challenge"),
                 GraphNode("score_evidence", service("evidence-scoring"), "research.score", "research.score"),
-                GraphNode("assess_curriculum_impact", agent("curriculum-impact-agent"), "research.impact", "research.impact"),
+                GraphNode(
+                    "assess_curriculum_impact",
+                    agent("curriculum-impact-agent"),
+                    "research.impact",
+                    "research.impact",
+                ),
                 GraphNode(
                     "curriculum_review",
                     ActorRef("program-accountable-human", "human", authority="A3"),
@@ -72,7 +102,9 @@ class ResearchGraph:
             edges=(
                 GraphEdge("normalize_question", "discover_sources"),
                 GraphEdge("discover_sources", "collect_evidence"),
-                GraphEdge("collect_evidence", "extract_capabilities"),
+                GraphEdge("collect_evidence", "analyse_labour_market"),
+                GraphEdge("analyse_labour_market", "analyse_technology"),
+                GraphEdge("analyse_technology", "extract_capabilities"),
                 GraphEdge("extract_capabilities", "challenge_conclusion"),
                 GraphEdge("challenge_conclusion", "score_evidence"),
                 GraphEdge("score_evidence", "assess_curriculum_impact"),
@@ -86,6 +118,8 @@ class ResearchGraph:
         self.kernel.register_handler("research.normalize", self._normalize)
         self.kernel.register_handler("research.discover", self._discover)
         self.kernel.register_handler("research.collect", self._collect)
+        self.kernel.register_handler("research.labour_market", self._labour_market)
+        self.kernel.register_handler("research.technology", self._technology)
         self.kernel.register_handler("research.extract_capabilities", self._extract)
         self.kernel.register_handler("research.challenge", self._challenge)
         self.kernel.register_handler("research.score", self._score)
@@ -102,6 +136,14 @@ class ResearchGraph:
         self.kernel.register_evaluator(
             "research.evidence",
             lambda state, result: (len(result.patch.get("evidence", [])) > 0, "evidence required"),
+        )
+        self.kernel.register_evaluator(
+            "research.labour_market",
+            lambda state, result: ("labour_market" in result.patch, "labour-market analysis required"),
+        )
+        self.kernel.register_evaluator(
+            "research.technology",
+            lambda state, result: ("technology" in result.patch, "technology analysis required"),
         )
         self.kernel.register_evaluator(
             "research.capabilities",
@@ -158,8 +200,27 @@ class ResearchGraph:
             evidence=[{"type": "evidence_set", "count": len(evidence)}],
         )
 
+    def _labour_market(self, state: dict[str, Any]) -> NodeResult:
+        analysis = self.provider.analyze_labour_market(state["research"], state["evidence"])
+        return NodeResult(
+            patch={"labour_market": analysis},
+            evidence=[{"type": "labour_market_analysis"}],
+        )
+
+    def _technology(self, state: dict[str, Any]) -> NodeResult:
+        analysis = self.provider.analyze_technology(state["research"], state["evidence"])
+        return NodeResult(
+            patch={"technology": analysis},
+            evidence=[{"type": "technology_analysis"}],
+        )
+
     def _extract(self, state: dict[str, Any]) -> NodeResult:
-        capabilities = self.provider.extract_capabilities(state["research"], state["evidence"])
+        capabilities = self.provider.extract_capabilities(
+            state["research"],
+            state["evidence"],
+            state["labour_market"],
+            state["technology"],
+        )
         return NodeResult(
             patch={"capabilities": capabilities},
             evidence=[{"type": "capability_extraction", "count": len(capabilities)}],
@@ -197,6 +258,8 @@ class ResearchGraph:
         finding = {
             "question": state["research"]["question"],
             "geography": state["research"].get("geography", "Canada"),
+            "labour_market": state["labour_market"],
+            "technology": state["technology"],
             "capabilities": state["capabilities"],
             "confidence": state["evidence_score"]["confidence"],
             "contradiction_status": state["challenge"].get("status"),
