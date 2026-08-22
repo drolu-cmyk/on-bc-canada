@@ -80,7 +80,7 @@ jobs:
           role-session-name: sozorock-ca-${{ github.run_id }}
           allowed-account-ids: "891377012881"
       - name: Verify CloudFront Function permissions
-        run: ./scripts/preflight_cloudfront_function.sh
+        run: bash scripts/preflight_cloudfront_function.sh
       - name: Deploy and publish
         env:
           AWS_ACCOUNT_ID: "891377012881"
@@ -93,4 +93,4 @@ jobs:
           LEGACY_WWW_DOMAIN: www.sozorock.ca
           STACK_NAME: sozorock-ca-public-site
           PUBLIC_SITE_BUCKET_NAME: ${{ vars.PUBLIC_SITE_BUCKET_NAME || 'sozorock-ca-public-site-891377012881' }}
-        run: ./scripts/deploy_public_site.sh
+        run: bash scripts/deploy_public_site.sh
