@@ -110,17 +110,26 @@ replace_dns_with_api_gateway "${LEGACY_WWW_DOMAIN}" "${www_domain}" "${www_zone}
 verify_redirect() {
   local url="$1"
   local expected="$2"
+  local attempt
   local response
   local status
   local location
 
-  response="$(curl -sSI "${url}")"
-  status="$(awk 'NR==1 {print $2}' <<<"${response}")"
-  location="$(awk 'BEGIN{IGNORECASE=1} /^location:/ {$1=""; sub(/^ /,""); gsub(/\r/,""); print}' <<<"${response}")"
-  if [[ "${status}" != "301" || "${location}" != "${expected}" ]]; then
-    echo "Redirect verification failed for ${url}: status=${status}, location=${location}, expected=${expected}" >&2
-    exit 1
-  fi
+  for attempt in $(seq 1 36); do
+    response="$(curl -sSI --max-time 15 "${url}" || true)"
+    status="$(awk 'NR==1 {print $2}' <<<"${response}")"
+    location="$(awk 'BEGIN{IGNORECASE=1} /^location:/ {$1=""; sub(/^ /,""); gsub(/\r/,""); print}' <<<"${response}")"
+    if [[ "${status}" == "301" && "${location}" == "${expected}" ]]; then
+      return
+    fi
+    if [[ "${attempt}" -lt 36 ]]; then
+      echo "Waiting for public DNS/cache convergence for ${url} (attempt ${attempt}/36, status=${status:-none})."
+      sleep 10
+    fi
+  done
+
+  echo "Redirect verification failed for ${url}: status=${status:-none}, location=${location:-none}, expected=${expected}" >&2
+  exit 1
 }
 
 verify_redirect "https://${LEGACY_ROOT_DOMAIN}/" "${CANONICAL_ORIGIN}/"
