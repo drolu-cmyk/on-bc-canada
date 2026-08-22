@@ -10,18 +10,8 @@ class FakeProvider:
 
     def discover(self, research):
         return [
-            {
-                "source_id": "job-1",
-                "publisher": "Example Employer",
-                "date": "2026-08-01",
-                "url": "https://example.invalid/job-1",
-            },
-            {
-                "source_id": "job-2",
-                "publisher": "Example Employer 2",
-                "date": "2026-08-02",
-                "url": "https://example.invalid/job-2",
-            },
+            {"source_id": "job-1", "publisher": "Example Employer"},
+            {"source_id": "job-2", "publisher": "Example Employer 2"},
         ]
 
     def collect(self, research, sources):
@@ -30,7 +20,36 @@ class FakeProvider:
             {"source_id": "job-2", "claim": "role requires tool permission design", "geography": "Canada"},
         ]
 
-    def extract_capabilities(self, research, evidence):
+    def analyze_labour_market(self, research, evidence):
+        return {
+            "signals": [
+                {
+                    "role": "Applied AI Developer",
+                    "capability_hint": "agent evaluation",
+                    "geography": "Canada",
+                    "signal": "repeated",
+                    "source_ids": ["job-1", "job-2"],
+                    "note": "deterministic fixture",
+                }
+            ],
+            "concentration_risks": [],
+        }
+
+    def analyze_technology(self, research, evidence):
+        return {
+            "signals": [
+                {
+                    "technology": "agent evaluation harness",
+                    "relationship": "supports reliable autonomous workflows",
+                    "maturity": "growing",
+                    "source_ids": ["job-1"],
+                    "note": "deterministic fixture",
+                }
+            ],
+            "substitution_notes": ["learning outcome stays tool-neutral"],
+        }
+
+    def extract_capabilities(self, research, evidence, labour_market, technology):
         return [
             {"capability": "agent evaluation", "support": 1},
             {"capability": "tool permission design", "support": 1},
@@ -66,6 +85,8 @@ class ResearchGraphTests(unittest.TestCase):
         self.assertEqual("waiting_approval", execution.status)
         self.assertEqual("curriculum_review", execution.current_node)
         self.assertEqual(0.82, execution.state["evidence_score"]["confidence"])
+        self.assertEqual("repeated", execution.state["labour_market"]["signals"][0]["signal"])
+        self.assertEqual("growing", execution.state["technology"]["signals"][0]["maturity"])
         self.assertNotIn("finding", execution.state)
 
         execution = kernel.decide(
