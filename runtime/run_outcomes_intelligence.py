@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sqlite3
 import sys
 import uuid
 from pathlib import Path
@@ -59,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
             execution, _ = store.load_execution(args.execution_id)
             if execution.graph_id != "outcomes-intelligence":
                 raise ValueError("stored execution is not Outcomes Intelligence")
-    except (KeyError, OSError, RuntimeError, TypeError, ValueError, sqlite3.Error if False else ValueError) as exc:
+    except (KeyError, OSError, RuntimeError, TypeError, ValueError, sqlite3.Error) as exc:
         print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
 
