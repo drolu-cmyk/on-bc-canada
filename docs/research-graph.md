@@ -17,7 +17,7 @@ research question
   -> Contradiction Agent challenge
   -> deterministic confidence score
   -> Curriculum Impact Agent recommendation
-  -> human review when change is proposed
+  -> human review when change is recommended
   -> record validated finding
 ```
 
@@ -34,7 +34,7 @@ The graph owns the sequence. Agents do not call each other freely or determine t
 | Capability Agent | Convert evidence into observable, tool-neutral capabilities | A1 analysis only |
 | Contradiction Agent | Search for counterevidence and reasons to reduce confidence | A1 challenge only |
 | Curriculum Impact Agent | Recommend whether a pathway review is warranted | A1 recommendation only |
-| Programme accountable person | Decide whether a proposed pathway change may proceed | A3 human decision |
+| Programme accountable person | Decide whether a recommended pathway change may proceed | A3 human decision |
 
 No research agent may authorize curriculum changes, publish claims, spend money, contact an employer, or modify a production system.
 
