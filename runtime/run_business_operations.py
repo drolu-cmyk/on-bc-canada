@@ -13,7 +13,7 @@ from runtime.business_operations_runner import (
     resume_business_operations,
     start_business_operations,
 )
-from runtime.graph_execution_store import GraphExecutionStore
+from runtime.execution_store_factory import create_execution_store
 from runtime.openai_business_operations_provider import OpenAIBusinessOperationsProvider
 
 
@@ -24,7 +24,7 @@ ACTION_CLASSES = ("analysis", "prepare", "external_publish", "external_contact",
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the routed Business Operations Graph.")
-    parser.add_argument("--db", default=str(DEFAULT_DB), help="Local SQLite execution-state path.")
+    parser.add_argument("--db", default=str(DEFAULT_DB), help="Local SQLite path when SOZOROCK_EXECUTION_BACKEND=local.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     start = subparsers.add_parser("start", help="Start one bounded business-operations execution.")
@@ -55,7 +55,7 @@ def _provider() -> OpenAIBusinessOperationsProvider:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    store = GraphExecutionStore(args.db)
+    store = create_execution_store(local_path=args.db)
     try:
         if args.command == "start":
             if not os.getenv("OPENAI_API_KEY"):

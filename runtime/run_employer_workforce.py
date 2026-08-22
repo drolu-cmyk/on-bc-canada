@@ -10,7 +10,7 @@ from pathlib import Path
 
 from runtime.employer_workforce_context import AggregateMetric, EmployerWorkforceRequest, WorkTask
 from runtime.employer_workforce_runner import employer_workforce_summary, start_employer_workforce_analysis
-from runtime.graph_execution_store import GraphExecutionStore
+from runtime.execution_store_factory import create_execution_store
 from runtime.openai_employer_workforce_provider import OpenAIEmployerWorkforceProvider
 
 
@@ -71,7 +71,7 @@ def _load_request(path: str) -> EmployerWorkforceRequest:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    store = GraphExecutionStore(args.execution_db)
+    store = create_execution_store(local_path=args.execution_db)
 
     try:
         if args.command == "start":

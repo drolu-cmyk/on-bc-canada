@@ -10,7 +10,7 @@ from pathlib import Path
 
 from runtime.capability_graph import CapabilityGraphStore
 from runtime.career_mobility_runner import career_mobility_summary, start_career_mobility
-from runtime.graph_execution_store import GraphExecutionStore
+from runtime.execution_store_factory import create_execution_store
 from runtime.learner_progress_store import LearnerProgressStore
 from runtime.openai_career_mobility_provider import OpenAICareerMobilityProvider
 from runtime.work_intelligence import WorkIntelligenceStore
@@ -50,7 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     learner_store = LearnerProgressStore(args.learner_db)
     capability_store = CapabilityGraphStore(args.capability_db)
     work_store = WorkIntelligenceStore(args.work_db)
-    execution_store = GraphExecutionStore(args.execution_db)
+    execution_store = create_execution_store(local_path=args.execution_db)
 
     try:
         if args.command == "start":

@@ -9,7 +9,7 @@ import uuid
 from pathlib import Path
 
 from runtime.capability_graph import CapabilityGraphStore
-from runtime.graph_execution_store import GraphExecutionStore
+from runtime.execution_store_factory import create_execution_store
 from runtime.learner_execution_runner import (
     learner_assessment_summary,
     resume_learner_assessment,
@@ -58,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     progress = LearnerProgressStore(args.learner_db)
     capabilities = CapabilityGraphStore(args.capability_db)
-    executions = GraphExecutionStore(args.execution_db)
+    executions = create_execution_store(local_path=args.execution_db)
 
     try:
         if args.command == "start":

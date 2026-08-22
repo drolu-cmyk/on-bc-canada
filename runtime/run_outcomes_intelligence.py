@@ -9,7 +9,7 @@ import sys
 import uuid
 from pathlib import Path
 
-from runtime.graph_execution_store import GraphExecutionStore
+from runtime.execution_store_factory import create_execution_store
 from runtime.openai_outcomes_provider import OpenAIOutcomesIntelligenceProvider
 from runtime.outcomes_intelligence import OutcomesSnapshotBuilder
 from runtime.outcomes_intelligence_runner import outcomes_intelligence_summary, start_outcomes_intelligence
@@ -43,7 +43,7 @@ def _provider() -> OpenAIOutcomesIntelligenceProvider:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    store = GraphExecutionStore(args.execution_db)
+    store = create_execution_store(local_path=args.execution_db)
     try:
         if args.command == "start":
             snapshot = OutcomesSnapshotBuilder(args.learner_db).build(
