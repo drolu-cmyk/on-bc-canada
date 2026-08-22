@@ -147,7 +147,7 @@
             "SslSupportMethod": "sni-only",
             "MinimumProtocolVersion": "TLSv1.2_2021"
           },
-          "IsIPV6Enabled": true
+          "IPV6Enabled": true
         }
       }
     },
