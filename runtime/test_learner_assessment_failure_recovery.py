@@ -5,23 +5,20 @@ import unittest
 from pathlib import Path
 
 from runtime.graph_execution_store import GraphExecutionStore
-from runtime.learner_assessment_runner import start_learner_assessment
+from runtime.learner_execution_runner import start_learner_assessment
 from runtime.learner_progress_store import LearnerProgressStore
 from runtime.test_learner_progress_store import build_learning_fixture
 
 
 class FailingProvider:
-    def normalize(self, request):
-        return request
-
-    def review_submission(self, request):
+    def coach(self, context):
         raise RuntimeError("simulated model or runtime failure")
 
-    def assess_evidence(self, request, review):
-        raise AssertionError("assessment must not run after review failure")
+    def analyze_progress(self, context):
+        raise AssertionError("progress must not run after coaching failure")
 
-    def challenge_assessment(self, request, review, assessment):
-        raise AssertionError("challenge must not run after review failure")
+    def prepare_human_review(self, context):
+        raise AssertionError("review preparation must not run after coaching failure")
 
 
 class LearnerAssessmentFailureRecoveryTests(unittest.TestCase):
@@ -60,7 +57,6 @@ class LearnerAssessmentFailureRecoveryTests(unittest.TestCase):
                 capability_store=capabilities,
                 execution_id="assessment-failure-001",
                 submission_id=submission["submission_id"],
-                evidence_material=[],
             )
 
             self.assertEqual("failed", execution.status)
