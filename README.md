@@ -38,6 +38,8 @@ The program publishes only claims supported by current records. Participation is
 - [Public information site](site/index.html)
 - [Contribution and release rules](CONTRIBUTING.md)
 - [Program architecture](docs/program-architecture.md)
+- [Graph runtime](docs/graph-runtime.md)
+- [Canadian technical-work research graph](docs/research-graph.md)
 - [Specialization curriculum](docs/specialization-curriculum.md)
 - [Automation capabilities](docs/automation-capabilities.md)
 - [Learner operations](docs/learner-operations.md)
