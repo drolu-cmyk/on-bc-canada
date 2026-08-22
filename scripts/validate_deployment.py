@@ -56,6 +56,7 @@ def validate_template() -> list[str]:
     required_types = {
         "PublicSiteBucket": "AWS::S3::Bucket",
         "PublicSiteOriginAccessControl": "AWS::CloudFront::OriginAccessControl",
+        "CanonicalRouteFunction": "AWS::CloudFront::Function",
         "PublicSiteDistribution": "AWS::CloudFront::Distribution",
         "PublicSiteBucketPolicy": "AWS::S3::BucketPolicy",
     }
@@ -64,6 +65,16 @@ def validate_template() -> list[str]:
             errors.append(f"missing resource type {name}={expected_type}")
     if "LegacyDomainRedirectFunction" in resources:
         errors.append("legacy redirects must not share the canonical CloudFront distribution")
+
+    route_function = resources.get("CanonicalRouteFunction", {}).get("Properties", {})
+    if route_function.get("AutoPublish") is not True:
+        errors.append("canonical route function must auto-publish")
+    if route_function.get("FunctionConfig", {}).get("Runtime") != "cloudfront-js-2.0":
+        errors.append("canonical route function must use cloudfront-js-2.0")
+    function_code = route_function.get("FunctionCode", "")
+    for required_fragment in ["/index.html", ".html", "request.uri = uri + '.html'"]:
+        if required_fragment not in function_code:
+            errors.append(f"canonical route function is missing {required_fragment}")
 
     bucket = resources.get("PublicSiteBucket", {})
     props = bucket.get("Properties", {})
@@ -103,8 +114,13 @@ def validate_template() -> list[str]:
         errors.append("public site must allow GET and HEAD only")
     if behavior.get("ViewerProtocolPolicy") != "redirect-to-https":
         errors.append("public site must redirect HTTP to HTTPS")
-    if behavior.get("FunctionAssociations"):
-        errors.append("canonical CloudFront distribution must not contain legacy redirect functions")
+    associations = behavior.get("FunctionAssociations", [])
+    expected_association = {
+        "EventType": "viewer-request",
+        "FunctionARN": {"Fn::GetAtt": ["CanonicalRouteFunction", "FunctionARN"]},
+    }
+    if associations != [expected_association]:
+        errors.append("canonical CloudFront distribution must use only CanonicalRouteFunction on viewer-request")
     return errors
 
 
@@ -142,7 +158,7 @@ def main() -> int:
         print("Deployment validation failed:", file=sys.stderr)
         print("\n".join(errors), file=sys.stderr)
         return 1
-    print("Deployment validation passed for canonical canada.sozorock.com with legacy .ca redirects separated from CloudFront.")
+    print("Deployment validation passed for canonical canada.sozorock.com with clean routes and legacy .ca redirects separated from CloudFront.")
     return 0
 
 
