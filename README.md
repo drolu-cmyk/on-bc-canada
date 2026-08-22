@@ -41,6 +41,7 @@ The program publishes only claims supported by current records. Participation is
 - [Graph runtime](docs/graph-runtime.md)
 - [Platform Graph Harness](docs/platform-graph-harness.md)
 - [Agent identity, tool, and runtime policy](docs/agent-identity-tool-policy.md)
+- [Model runtime telemetry](docs/runtime-model-telemetry.md)
 - [Canadian technical-work research graph](docs/research-graph.md)
 - [Work Intelligence Graph](docs/work-intelligence-graph.md)
 - [Learner Capability Graph](docs/capability-graph.md)
