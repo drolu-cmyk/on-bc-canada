@@ -121,6 +121,7 @@ class RuntimeAssuranceGraph:
             boundary.get("contains_learner_identity") is False
             and boundary.get("contains_raw_graph_state") is False
             and boundary.get("contains_prompts_or_model_outputs") is False
+            and boundary.get("contains_tool_arguments_or_outputs") is False
             and boundary.get("contains_credentials") is False
         )
         return NodeResult(
@@ -160,6 +161,7 @@ class RuntimeAssuranceGraph:
             "contains_learner_identity",
             "contains_raw_graph_state",
             "contains_prompts_or_model_outputs",
+            "contains_tool_arguments_or_outputs",
             "contains_credentials",
         )
         if any(boundary.get(key) is not False for key in required_false):
