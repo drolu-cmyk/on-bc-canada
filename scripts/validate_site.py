@@ -16,6 +16,7 @@ def main():
  errors += [f'missing page: site/{x}' for x in sorted(required-files)]
  for retired in ('program.html','stories.html','enroll.html'):
   if (SITE/retired).exists():errors.append(f'site/{retired} must be retired')
+ if (SITE/'styles.css').exists():errors.append('site/styles.css must remain retired; reference-home.css is the only public design system')
  for path in sorted(SITE.glob('*.html')):
   s=path.read_text(encoding='utf-8')
   if path.name=='admin.html':
@@ -24,6 +25,9 @@ def main():
    continue
   for req in ('<html lang="en-CA">','<meta name="viewport"','<meta name="description"','<title>','id="main"','href="#main"'):
    if req not in s:errors.append(f'{path}: missing {req}')
+  if 'href="styles.css"' in s:errors.append(f'{path}: legacy styles.css reference is forbidden')
+  if '<link rel="stylesheet" href="reference-home.css">' not in s:errors.append(f'{path}: missing reference-home.css')
+  if path.name in PAGES and 'class="reference-footer"' not in s:errors.append(f'{path}: missing institutional footer')
   if s.count('<h1')!=1:errors.append(f'{path}: requires exactly one h1')
   has_form='<form' in s.lower()
   if has_form and path.name not in FORM_PAGES:errors.append(f'{path}: public form is not approved on this route')
@@ -39,9 +43,10 @@ def main():
   for target in re.findall(r'(?:href|src)="([^"]+)"',s):
    if target.startswith(('http:','https:','#','mailto:','tel:')):continue
    if not exists(target):errors.append(f'{path}: missing local target {target}')
- for asset in ('reference-home.css','site.js','forms.js','admin.js','engagement-config.js','favicon.svg','robots.txt','sitemap.xml'):
+ for asset in ('reference-home.css','site.js','forms.js','admin.js','engagement-config.js','favicon.svg','robots.txt','sitemap.xml','sitemap.xsl'):
   if not (SITE/asset).is_file():errors.append(f'site/{asset} is missing')
  sm=(SITE/'sitemap.xml').read_text(encoding='utf-8') if (SITE/'sitemap.xml').is_file() else ''
+ if '<?xml-stylesheet type="text/xsl" href="/sitemap.xsl"?>' not in sm:errors.append('site/sitemap.xml: missing human-readable XSL presentation')
  for route in PAGES.values():
   if f'<loc>{ORIGIN}{route}</loc>' not in sm:errors.append(f'sitemap missing {ORIGIN}{route}')
  for forbidden in ('/admin</loc>','/stories</loc>','/enroll</loc>','.html</loc>'):
