@@ -72,7 +72,15 @@ def validate_template() -> list[str]:
     if route_function.get("FunctionConfig", {}).get("Runtime") != "cloudfront-js-2.0":
         errors.append("canonical route function must use cloudfront-js-2.0")
     function_code = route_function.get("FunctionCode", "")
-    for required_fragment in ["/index.html", "/program.html", "/programs", ".html", "request.uri = uri + '.html'"]:
+    for required_fragment in [
+        "/index.html",
+        "/program.html",
+        "/programs",
+        "/stories.html",
+        "/impact",
+        ".html",
+        "request.uri = uri + '.html'",
+    ]:
         if required_fragment not in function_code:
             errors.append(f"canonical route function is missing {required_fragment}")
 
