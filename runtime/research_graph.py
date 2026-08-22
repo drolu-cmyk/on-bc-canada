@@ -255,9 +255,12 @@ class ResearchGraph:
 
     @staticmethod
     def _finalize(state: dict[str, Any]) -> NodeResult:
+        domain = state["research"].get("domain") or {}
         finding = {
             "question": state["research"]["question"],
             "geography": state["research"].get("geography", "Canada"),
+            "domain_id": domain.get("domain_id"),
+            "pathway_name": domain.get("pathway_name"),
             "labour_market": state["labour_market"],
             "technology": state["technology"],
             "capabilities": state["capabilities"],
@@ -269,5 +272,5 @@ class ResearchGraph:
         }
         return NodeResult(
             patch={"finding": finding, "research_status": "complete"},
-            evidence=[{"type": "validated_finding"}],
+            evidence=[{"type": "validated_finding", "domain_id": domain.get("domain_id")}],
         )
