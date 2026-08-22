@@ -9,12 +9,17 @@ import sys
 import uuid
 from pathlib import Path
 
+from runtime.aws_execution_assurance import (
+    DynamoRuntimeExecutionSource,
+    aggregate_dynamo_execution_rows,
+    apply_dynamo_executions_to_snapshot,
+)
 from runtime.aws_runtime_observability import (
     CloudWatchRuntimeTelemetrySource,
     apply_cloudwatch_runtime_to_snapshot,
     aws_observability_enabled,
 )
-from runtime.execution_store_factory import create_execution_store
+from runtime.execution_store_factory import create_execution_store, execution_backend
 from runtime.model_runtime_telemetry import telemetry_db_path
 from runtime.openai_runtime_assurance_provider import OpenAIRuntimeAssuranceProvider
 from runtime.runtime_assurance import RuntimeAssuranceSnapshotBuilder, RuntimeStoreSource
@@ -54,16 +59,22 @@ def _provider() -> OpenAIRuntimeAssuranceProvider:
 
 
 def _snapshot(args: argparse.Namespace) -> dict[str, object]:
-    sources = (
-        RuntimeStoreSource(args.execution_db, "generic_graph"),
-        RuntimeStoreSource(args.research_db, "research"),
-    )
-    if args.telemetry_source == "local":
-        return RuntimeAssuranceSnapshotBuilder(sources, model_telemetry_path=args.telemetry_db).build()
+    backend = execution_backend()
+    sources = [RuntimeStoreSource(args.research_db, "research")]
+    if backend == "local":
+        sources.insert(0, RuntimeStoreSource(args.execution_db, "generic_graph"))
 
-    base = RuntimeAssuranceSnapshotBuilder(sources).build()
-    cloud_runtime = CloudWatchRuntimeTelemetrySource().read()
-    return apply_cloudwatch_runtime_to_snapshot(base, cloud_runtime)
+    model_path = args.telemetry_db if args.telemetry_source == "local" else None
+    snapshot = RuntimeAssuranceSnapshotBuilder(tuple(sources), model_telemetry_path=model_path).build()
+
+    if backend == "aws":
+        rows = DynamoRuntimeExecutionSource().read_rows()
+        snapshot = apply_dynamo_executions_to_snapshot(snapshot, aggregate_dynamo_execution_rows(rows))
+
+    if args.telemetry_source == "aws":
+        cloud_runtime = CloudWatchRuntimeTelemetrySource().read()
+        snapshot = apply_cloudwatch_runtime_to_snapshot(snapshot, cloud_runtime)
+    return snapshot
 
 
 def main(argv: list[str] | None = None) -> int:
