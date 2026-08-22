@@ -9,6 +9,7 @@ import uuid
 from pathlib import Path
 
 from runtime.openai_research_provider import OpenAIResearchProvider
+from runtime.research_domain_packs import DOMAIN_PACKS, get_domain_pack
 from runtime.research_runner import execution_summary, resume_research, start_research
 from runtime.research_store import ResearchStore
 
@@ -22,11 +23,12 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     start = subparsers.add_parser("start", help="Start a live research execution.")
+    start.add_argument("--domain", required=True, choices=sorted(DOMAIN_PACKS))
     start.add_argument("--question", required=True)
     start.add_argument("--geography", default="Canada")
     start.add_argument("--execution-id", default=None)
 
-    resume = subparsers.add_parser("resume", help="Resolve a pending human gate and resume the graph.")
+    resume = subparsers.add_parser("resume", help="Resolve a human review gate and resume the graph.")
     resume.add_argument("--execution-id", required=True)
     decision = resume.add_mutually_exclusive_group(required=True)
     decision.add_argument("--approve", action="store_true")
@@ -40,10 +42,10 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _live_provider() -> OpenAIResearchProvider:
+def _live_provider(domain_id: str | None = None) -> OpenAIResearchProvider:
     if not os.getenv("OPENAI_API_KEY"):
         raise RuntimeError("OPENAI_API_KEY is required for a live research execution")
-    return OpenAIResearchProvider()
+    return OpenAIResearchProvider(domain_pack=get_domain_pack(domain_id) if domain_id else None)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -53,9 +55,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "start":
             execution = start_research(
-                provider=_live_provider(),
+                provider=_live_provider(args.domain),
                 store=store,
-                execution_id=args.execution_id or f"research-{uuid.uuid4().hex[:12]}",
+                execution_id=args.execution_id or f"research-{args.domain}-{uuid.uuid4().hex[:10]}",
                 question=args.question,
                 geography=args.geography,
             )

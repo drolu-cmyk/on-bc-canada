@@ -13,6 +13,8 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
 
+from runtime.research_domain_packs import ResearchDomainPack
+
 
 class SourceCandidate(BaseModel):
     source_id: str
@@ -132,12 +134,17 @@ def build_research_agents(model: str | None = None) -> ResearchAgentSet:
     from agents import Agent, WebSearchTool
 
     model_name = model or os.getenv("SOZOROCK_RESEARCH_MODEL", "gpt-5.6-sol")
+    domain_rule = (
+        "When INPUT_JSON includes research.domain, treat its source priorities, evidence rules, capability focus, "
+        "technology focus, and contradiction tests as binding research context. Do not widen the pathway merely to find more material. "
+    )
 
     research_director = Agent(
         name="Canadian Technical Work Research Director",
         model=model_name,
         instructions=(
-            "Find a compact, high-quality source set for a Canadian technical-work research question. "
+            domain_rule
+            + "Find a compact, high-quality source set for a Canadian technical-work research question. "
             "Prefer official Canadian government and Job Bank material, direct employer postings, reputable labour-market sources, "
             "and primary technology documentation. Avoid listicles and copied job-board duplicates when a primary source exists. "
             "Do not treat one posting as market demand. Return only sources that were actually found."
@@ -150,7 +157,8 @@ def build_research_agents(model: str | None = None) -> ResearchAgentSet:
         name="Evidence Agent",
         model=model_name,
         instructions=(
-            "Verify the supplied source candidates and extract only claims relevant to the research question. "
+            domain_rule
+            + "Verify the supplied source candidates and extract only claims relevant to the research question. "
             "Use web search to confirm source content and recency. Paraphrase evidence rather than reproducing long passages. "
             "Reject sources that cannot be verified or are materially stale for the question."
         ),
@@ -162,7 +170,8 @@ def build_research_agents(model: str | None = None) -> ResearchAgentSet:
         name="Canadian Labour Market Agent",
         model=model_name,
         instructions=(
-            "Analyze the supplied evidence for repeated Canadian work requirements, role patterns, geography, and concentration risk. "
+            domain_rule
+            + "Analyze the supplied evidence for repeated Canadian work requirements, role patterns, geography, and concentration risk. "
             "Do not convert frequency in a small sample into a national trend. Distinguish emerging, repeated, established, and uncertain signals."
         ),
         output_type=LabourMarketOutput,
@@ -172,7 +181,8 @@ def build_research_agents(model: str | None = None) -> ResearchAgentSet:
         name="Technology Signal Agent",
         model=model_name,
         instructions=(
-            "Identify technologies that materially change the work being studied. Separate durable capabilities from replaceable products, "
+            domain_rule
+            + "Identify technologies that materially change the work being studied. Separate durable capabilities from replaceable products, "
             "frameworks, and model vendors. Use web search only to verify current technology status or documentation when needed."
         ),
         tools=[WebSearchTool(search_context_size="medium", external_web_access=True)],
@@ -183,7 +193,8 @@ def build_research_agents(model: str | None = None) -> ResearchAgentSet:
         name="Capability Extraction Agent",
         model=model_name,
         instructions=(
-            "Translate market and technology evidence into observable, tool-neutral capabilities. A capability must describe work a person can "
+            domain_rule
+            + "Translate market and technology evidence into observable, tool-neutral capabilities. A capability must describe work a person can "
             "demonstrate, not a course topic or product name. Preserve source IDs so every capability remains traceable."
         ),
         output_type=SkillsOutput,
@@ -193,8 +204,10 @@ def build_research_agents(model: str | None = None) -> ResearchAgentSet:
         name="Contradiction Agent",
         model=model_name,
         instructions=(
-            "Try to disprove or narrow the emerging conclusion. Search for counterevidence, regional differences, obsolete requirements, "
-            "vendor-specific noise, weak samples, and evidence that the supposed trend is not durable. Never increase confidence."
+            domain_rule
+            + "Try to disprove or narrow the emerging conclusion. Search for counterevidence, regional differences, obsolete requirements, "
+            "vendor-specific noise, weak samples, and evidence that the supposed trend is not durable. Execute the domain contradiction tests "
+            "explicitly. Never increase confidence."
         ),
         tools=[WebSearchTool(search_context_size="medium", external_web_access=True)],
         output_type=ContradictionOutput,
@@ -204,7 +217,8 @@ def build_research_agents(model: str | None = None) -> ResearchAgentSet:
         name="Curriculum Impact Agent",
         model=model_name,
         instructions=(
-            "Compare validated capabilities with the supplied pathway context. Recommend no change unless the evidence supports a material gap. "
+            domain_rule
+            + "Compare validated capabilities with the supplied pathway context. Recommend no change unless the evidence supports a material gap. "
             "Any add, increase, reduce, or retire recommendation requires human review. You may recommend; you may not authorize or publish a change."
         ),
         output_type=CurriculumImpactOutput,
@@ -230,6 +244,7 @@ class OpenAIResearchProvider:
         runner: RunnerLike | None = None,
         *,
         max_turns: int = 8,
+        domain_pack: ResearchDomainPack | None = None,
     ) -> None:
         if agents is None:
             agents = build_research_agents()
@@ -240,18 +255,22 @@ class OpenAIResearchProvider:
         self.agents = agents
         self.runner = runner
         self.max_turns = max_turns
+        self.domain_pack = domain_pack
 
-    @staticmethod
-    def normalize(question: str) -> dict[str, Any]:
+    def normalize(self, question: str) -> dict[str, Any]:
         normalized = " ".join(question.split())
         if not normalized:
             raise ValueError("research question is required")
-        return {
+        research: dict[str, Any] = {
             "question": normalized,
             "geography": "Canada",
             "scope": "technical work",
             "evidence_standard": "current, attributable, traceable",
         }
+        if self.domain_pack is not None:
+            research["domain"] = self.domain_pack.as_context()
+            research["scope"] = self.domain_pack.research_goal
+        return research
 
     def _run(self, agent: Any, task: str, payload: dict[str, Any]) -> BaseModel:
         result = self.runner.run_sync(
@@ -267,7 +286,7 @@ class OpenAIResearchProvider:
     def discover(self, research: dict[str, Any]) -> list[dict[str, Any]]:
         output = self._run(
             self.agents.research_director,
-            "Build the source set for this Canadian technical-work research question.",
+            "Build the source set for this Canadian technical-work research question using the domain pack when supplied.",
             {"research": research},
         )
         assert isinstance(output, SourceDiscoveryOutput)
@@ -276,7 +295,7 @@ class OpenAIResearchProvider:
     def collect(self, research: dict[str, Any], sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
         output = self._run(
             self.agents.evidence_agent,
-            "Verify these sources and extract relevant evidence.",
+            "Verify these sources and extract relevant evidence under the domain-specific evidence rules.",
             {"research": research, "sources": sources},
         )
         assert isinstance(output, EvidenceOutput)
@@ -285,7 +304,7 @@ class OpenAIResearchProvider:
     def analyze_labour_market(self, research: dict[str, Any], evidence: list[dict[str, Any]]) -> dict[str, Any]:
         output = self._run(
             self.agents.labour_market_agent,
-            "Identify labour-market signals without overstating the sample.",
+            "Identify labour-market signals without overstating the sample or crossing the domain boundary.",
             {"research": research, "evidence": evidence},
         )
         assert isinstance(output, LabourMarketOutput)
@@ -294,7 +313,7 @@ class OpenAIResearchProvider:
     def analyze_technology(self, research: dict[str, Any], evidence: list[dict[str, Any]]) -> dict[str, Any]:
         output = self._run(
             self.agents.technology_agent,
-            "Separate durable technical capabilities from replaceable technologies and identify material technology shifts.",
+            "Separate durable technical capabilities from replaceable technologies and identify material technology shifts for this domain.",
             {"research": research, "evidence": evidence},
         )
         assert isinstance(output, TechnologyOutput)
@@ -309,7 +328,7 @@ class OpenAIResearchProvider:
     ) -> list[dict[str, Any]]:
         output = self._run(
             self.agents.skills_agent,
-            "Extract observable, tool-neutral capabilities from the validated evidence and analyses.",
+            "Extract observable, tool-neutral capabilities from the validated evidence and analyses, using the domain capability focus as a boundary rather than a quota.",
             {
                 "research": research,
                 "evidence": evidence,
@@ -328,7 +347,7 @@ class OpenAIResearchProvider:
     ) -> dict[str, Any]:
         output = self._run(
             self.agents.contradiction_agent,
-            "Challenge the current conclusion and look for evidence that should reduce confidence or narrow scope.",
+            "Challenge the current conclusion, execute the domain contradiction tests, and look for evidence that should reduce confidence or narrow scope.",
             {"research": research, "capabilities": capabilities, "evidence": evidence},
         )
         assert isinstance(output, ContradictionOutput)
@@ -362,7 +381,7 @@ class OpenAIResearchProvider:
     ) -> dict[str, Any]:
         output = self._run(
             self.agents.curriculum_impact_agent,
-            "Assess whether the evidence warrants a pathway review. The graph, not the agent, owns the approval decision.",
+            "Assess whether the evidence warrants a pathway review inside the named domain. The graph, not the agent, owns the approval decision.",
             {"research": research, "capabilities": capabilities, "evidence_score": score},
         )
         assert isinstance(output, CurriculumImpactOutput)

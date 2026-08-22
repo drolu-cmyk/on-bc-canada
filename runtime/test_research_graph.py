@@ -6,7 +6,15 @@ from runtime.research_graph import ResearchGraph
 
 class FakeProvider:
     def normalize(self, question):
-        return {"question": question.strip(), "geography": "Canada", "scope": "technical work"}
+        return {
+            "question": question.strip(),
+            "geography": "Canada",
+            "scope": "technical work",
+            "domain": {
+                "domain_id": "applied-ai-systems",
+                "pathway_name": "Applied AI Systems",
+            },
+        }
 
     def discover(self, research):
         return [
@@ -87,6 +95,7 @@ class ResearchGraphTests(unittest.TestCase):
         self.assertEqual(0.82, execution.state["evidence_score"]["confidence"])
         self.assertEqual("repeated", execution.state["labour_market"]["signals"][0]["signal"])
         self.assertEqual("growing", execution.state["technology"]["signals"][0]["maturity"])
+        self.assertEqual("applied-ai-systems", execution.state["research"]["domain"]["domain_id"])
         self.assertNotIn("finding", execution.state)
 
         execution = kernel.decide(
@@ -99,6 +108,8 @@ class ResearchGraphTests(unittest.TestCase):
         self.assertEqual("completed", execution.status)
         self.assertEqual("complete", execution.state["research_status"])
         self.assertEqual(2, execution.state["finding"]["source_count"])
+        self.assertEqual("applied-ai-systems", execution.state["finding"]["domain_id"])
+        self.assertEqual("Applied AI Systems", execution.state["finding"]["pathway_name"])
         self.assertEqual("increase", execution.state["finding"]["curriculum_impact"]["recommendation"])
 
 
