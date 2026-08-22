@@ -44,6 +44,7 @@ The program publishes only claims supported by current records. Participation is
 - [Model runtime telemetry](docs/runtime-model-telemetry.md)
 - [AWS runtime observability](docs/aws-runtime-observability.md)
 - [AWS durable execution](docs/aws-durable-execution.md)
+- [PostgreSQL domain data plane](docs/postgres-domain-data.md)
 - [Canadian technical-work research graph](docs/research-graph.md)
 - [Work Intelligence Graph](docs/work-intelligence-graph.md)
 - [Learner Capability Graph](docs/capability-graph.md)
@@ -74,6 +75,7 @@ python scripts/validate_site.py
 python scripts/validate_deployment.py
 python scripts/validate_runtime_observability.py
 python scripts/validate_durable_execution.py
+python scripts/validate_domain_data.py
 PYTHONPATH=compiler/src python -m unittest discover -s compiler/tests -v
 python -m runtime.run_platform_graph_harness validate
 python -m runtime.run_agent_identity_policy validate
