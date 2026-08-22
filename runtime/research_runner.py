@@ -64,6 +64,13 @@ def execution_summary(execution: GraphExecution) -> dict[str, Any]:
         "status": execution.status,
         "current_node": execution.current_node,
     }
+    research = execution.state.get("research", {})
+    domain = research.get("domain") or {}
+    if domain:
+        summary["domain"] = {
+            "domain_id": domain.get("domain_id"),
+            "pathway_name": domain.get("pathway_name"),
+        }
     if execution.pending_approval is not None:
         summary["pending_approval"] = execution.pending_approval
     if execution.failure:
