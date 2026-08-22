@@ -48,6 +48,8 @@ The program publishes only claims supported by current records. Participation is
 - [Learner Execution Graph](docs/learner-execution-graph.md)
 - [Career Mobility Graph](docs/career-mobility-graph.md)
 - [Employer Workforce Graph](docs/employer-workforce-graph.md)
+- [Outcomes Intelligence](docs/outcomes-intelligence.md)
+- [Runtime Assurance](docs/runtime-assurance.md)
 - [Product Development Graph](docs/product-development-graph.md)
 - [Business Operations Graph](docs/business-operations-graph.md)
 - [Specialization curriculum](docs/specialization-curriculum.md)

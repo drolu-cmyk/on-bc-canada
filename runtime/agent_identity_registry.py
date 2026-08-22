@@ -62,6 +62,8 @@ BUSINESS_DATA = ("operational", "business_context", "organization_aggregate", "f
 LEARNER_DATA = ("deidentified_learning_metadata", "capability_standard")
 CAREER_DATA = ("deidentified_accepted_capability_metadata", "work_intelligence")
 EMPLOYER_DATA = ("organization_workflow", "aggregate_metrics", "public_research")
+OUTCOMES_DATA = ("aggregate_outcomes", "measurement_metadata")
+RUNTIME_ASSURANCE_DATA = ("aggregate_runtime_telemetry", "runtime_control_state", "telemetry_coverage")
 ORCHESTRATOR_DATA = ("orchestration_metadata",)
 
 
@@ -198,6 +200,10 @@ AGENT_IDENTITIES: dict[str, AgentIdentity] = {
         _identity("ai-adoption-risk-agent", "AI Adoption Risk Agent", "employer_workforce", "employer-workforce", "AI adoption risk", EMPLOYER_DATA, max_turns=7),
         _identity("ai-adoption-pilot-agent", "AI Adoption Pilot Agent", "employer_workforce", "employer-workforce", "AI adoption pilot", EMPLOYER_DATA, max_turns=7),
         _identity("ai-adoption-measurement-agent", "AI Adoption Measurement Agent", "employer_workforce", "employer-workforce", "AI adoption measurement", EMPLOYER_DATA, max_turns=7),
+        _identity("outcomes-analysis-agent", "Outcomes Analysis Agent", "outcomes_intelligence", "outcomes-intelligence", "programme outcomes intelligence", OUTCOMES_DATA, max_turns=6),
+        _identity("outcomes-challenge-agent", "Outcomes Challenge Agent", "outcomes_intelligence", "outcomes-intelligence", "programme outcomes challenge", OUTCOMES_DATA, max_turns=6),
+        _identity("runtime-reliability-agent", "Runtime Reliability Agent", "runtime_assurance", "runtime-assurance", "runtime reliability assurance", RUNTIME_ASSURANCE_DATA, max_turns=6),
+        _identity("runtime-control-agent", "Runtime Control Agent", "runtime_assurance", "runtime-assurance", "runtime control assurance", RUNTIME_ASSURANCE_DATA, max_turns=6),
         _identity("platform-orchestrator-agent", "Platform Orchestrator Agent", "platform_orchestration", None, "platform orchestration", ORCHESTRATOR_DATA, max_turns=6, budget_class="low"),
     )
 }
@@ -210,6 +216,8 @@ WORKFLOW_RUNTIME_BUDGETS: dict[str, WorkflowRuntimeBudget] = {
     "learner_execution": WorkflowRuntimeBudget("learner_execution", 3, 0, "standard"),
     "career_mobility": WorkflowRuntimeBudget("career_mobility", 5, 0, "standard"),
     "employer_workforce": WorkflowRuntimeBudget("employer_workforce", 7, 0, "standard"),
+    "outcomes_intelligence": WorkflowRuntimeBudget("outcomes_intelligence", 2, 0, "standard"),
+    "runtime_assurance": WorkflowRuntimeBudget("runtime_assurance", 2, 0, "standard"),
     "platform_orchestration": WorkflowRuntimeBudget("platform_orchestration", 1, 0, "low"),
 }
 

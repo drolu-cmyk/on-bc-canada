@@ -6,7 +6,7 @@ It keeps platform autonomy governable as more specialist agents and graphs are a
 
 ## Registered graphs
 
-The registry contains six GraphKernel workflows:
+The registry contains eight GraphKernel workflows:
 
 | Work type | Graph | Human authority |
 | --- | --- | --- |
@@ -16,6 +16,8 @@ The registry contains six GraphKernel workflows:
 | Learner Execution | `learner-execution` | A3 for capability-evidence acceptance |
 | Career Mobility | `career-mobility` | none; learner guidance only |
 | Employer Workforce | `employer-workforce` | none; organization analysis only |
+| Outcomes Intelligence | `outcomes-intelligence` | none; aggregate programme analysis and research-question preparation only |
+| Runtime Assurance | `runtime-assurance` | none; aggregate assurance and human-intervention recommendation only |
 
 The Capability Graph and Learning Graph remain reviewed state layers rather than GraphKernel execution workflows. They are not represented as execution graphs merely to make the registry larger.
 
@@ -82,9 +84,11 @@ The current Product Development and Business Operations graphs create authorizat
 
 Learner Execution is different in one important respect: after the A3 evidence-review decision, deterministic code may write the accepted capability-evidence record to the learner progress store. The model never performs that write.
 
+Outcomes Intelligence and Runtime Assurance have no protected consequential write because they are analysis-and-preparation workflows only.
+
 ## Data boundaries
 
-Every graph now declares two data boundaries:
+Every graph declares two data boundaries:
 
 `runtime_data_classes`
 : Data the local graph runtime may need to operate.
@@ -97,6 +101,8 @@ Examples:
 - Learner Execution may use pseudonymous learner and evidence references locally, while its model workers receive only deidentified learning metadata and capability standards.
 - Career Mobility may use a pseudonymous learner instance locally, while model workers receive deidentified accepted-capability metadata and Work Intelligence.
 - Employer Workforce may hold a local organization reference, while model workers receive organization workflow and aggregate metric data only.
+- Outcomes Intelligence receives only privacy-released aggregate outcomes and measurement metadata; cohort identifiers and learner-private references are outside its model contract.
+- Runtime Assurance receives aggregate execution/control telemetry and telemetry-coverage metadata; raw graph state, prompt content, model output content, and credential material are forbidden.
 
 The common forbidden model boundary includes raw learner submissions, direct learner identifiers, individual employee records, payment credentials, and production secrets.
 
@@ -143,12 +149,25 @@ Employer Workforce
 Learner Execution
   -> Career Mobility
   pseudonymous learner instance only after A3-accepted capability evidence exists
+
+Outcomes Intelligence
+  -> Research Intelligence
+  privacy-released aggregate outcome signal only
+  the Outcomes Challenge Agent must first preserve the question
+  Research Intelligence must independently validate it
+
+Runtime Assurance
+  -> Product Development
+  runtime-assurance problem statement and telemetry coverage only
+  Product Development retains its existing A3 release boundary
 ```
 
-Two boundaries are intentional:
+Several boundaries are intentional:
 
 - Employer Workforce cannot write a capability signal directly into Work Intelligence.
 - Learner Execution cannot pass raw learner submissions into Career Mobility.
+- Outcomes Intelligence cannot write an outcome signal directly into Work Intelligence or curriculum.
+- Runtime Assurance cannot use a remediation handoff to disable an agent, change runtime policy, deploy code, or mutate production.
 
 An unregistered direct handoff fails closed.
 
@@ -158,38 +177,39 @@ The safest route remains explicit deterministic routing:
 
 ```bash
 python -m runtime.run_platform_graph_harness route \
-  --work-type learner_execution
+  --work-type outcomes_intelligence
 ```
 
 A richer dispatch check validates the data and effect boundary:
 
 ```bash
 python -m runtime.run_platform_graph_harness dispatch \
-  --work-type employer_workforce \
+  --work-type runtime_assurance \
   --mode analyze \
   --effect analysis \
-  --data-class organization_workflow \
-  --data-class aggregate_metrics
+  --data-class aggregate_runtime_telemetry \
+  --data-class runtime_control_state \
+  --data-class telemetry_coverage
 ```
 
 Validate model context separately:
 
 ```bash
 python -m runtime.run_platform_graph_harness model-context \
-  --work-type career_mobility \
-  --data-class deidentified_accepted_capability_metadata \
-  --data-class work_intelligence
+  --work-type outcomes_intelligence \
+  --data-class aggregate_outcomes \
+  --data-class measurement_metadata
 ```
 
 Validate a handoff:
 
 ```bash
 python -m runtime.run_platform_graph_harness handoff \
-  --source-work-type employer_workforce \
+  --source-work-type outcomes_intelligence \
   --target-kind graph \
   --target-id canadian-work-research \
-  --data-class organization_aggregate \
-  --data-class capability_signal
+  --data-class aggregate_outcomes \
+  --data-class outcome_signal
 ```
 
 ## Optional Platform Orchestrator Agent
@@ -200,7 +220,7 @@ It is deliberately not the routing authority.
 
 The manager:
 
-- can return only one of the six registered work types
+- can return only one of the eight registered work types
 - receives objective metadata, declared data-class labels, mode, and requested effect
 - has no graph-execution tools
 - has no external-action tools
@@ -209,16 +229,7 @@ The manager:
 
 After the manager proposes a work type, `PlatformGraphHarness.validate_dispatch()` still makes the deterministic decision.
 
-Live proposal requires `OPENAI_API_KEY`:
-
-```bash
-python -m runtime.run_platform_graph_harness propose \
-  --objective "Assess whether this organization workflow has a justified AI opportunity." \
-  --mode analyze \
-  --effect analysis \
-  --data-class organization_workflow \
-  --data-class aggregate_metrics
-```
+Live proposal requires `OPENAI_API_KEY`.
 
 ## Deterministic evaluation cases
 
@@ -234,7 +245,7 @@ The harness includes a standing case matrix covering boundaries such as:
 - organization-level Employer Workforce analysis is allowed
 - individual employee data is blocked
 
-These cases run as part of the harness validation rather than depending on exact model prose.
+The runtime test suite adds explicit cases for aggregate Outcomes and Runtime Assurance context, handoff, privacy, and production-mutation boundaries.
 
 ## CI gate
 
@@ -246,11 +257,7 @@ python -m runtime.run_platform_graph_harness validate
 
 The command validates structural graph contracts and the dispatch case matrix. It exits non-zero when a graph changes authority, bypasses a protected human gate, expands a model data boundary without registry review, introduces an undeclared handoff, or violates a standing dispatch case.
 
-Inspect the full registry:
-
-```bash
-python -m runtime.run_platform_graph_harness manifest
-```
+The separate Agent Identity Policy audit reconstructs every current SDK worker and verifies its NHI, tool scope, typed output, model-data scope, and turn budget.
 
 ## Why this layer matters
 

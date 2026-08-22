@@ -15,7 +15,7 @@ from runtime.platform_graph_registry import GRAPH_CONTRACTS, GraphContract, Prot
 class PlatformGraphHarnessTests(unittest.TestCase):
     def test_all_registered_graphs_pass_current_contracts(self):
         reports = PlatformGraphHarness().require_valid_registry()
-        self.assertEqual(6, len(reports))
+        self.assertEqual(8, len(reports))
         self.assertEqual(
             {
                 "canadian-work-research",
@@ -24,6 +24,8 @@ class PlatformGraphHarnessTests(unittest.TestCase):
                 "learner-execution",
                 "career-mobility",
                 "employer-workforce",
+                "outcomes-intelligence",
+                "runtime-assurance",
             },
             {report.graph_id for report in reports},
         )
@@ -124,10 +126,7 @@ class PlatformGraphHarnessTests(unittest.TestCase):
                 GraphNode("review", ActorRef("human", "human", authority="A3"), approval_reason="review"),
                 GraphNode("write", ActorRef("writer", "service", authority="A1"), "test.write"),
             ),
-            edges=(
-                GraphEdge("prepare", "review"),
-                GraphEdge("review", "write", route="approved"),
-            ),
+            edges=(GraphEdge("prepare", "review"), GraphEdge("review", "write", route="approved")),
         )
         contract = GraphContract(
             work_type="guarded",
@@ -176,6 +175,27 @@ class PlatformGraphHarnessTests(unittest.TestCase):
         decision = PlatformGraphHarness().validate_model_context("employer_workforce", ("employee_individual",))
         self.assertFalse(decision.allowed)
         self.assertIn("forbidden", decision.reason)
+
+    def test_outcomes_model_context_rejects_learner_private_reference(self):
+        harness = PlatformGraphHarness()
+        accepted = harness.validate_model_context(
+            "outcomes_intelligence",
+            ("aggregate_outcomes", "measurement_metadata"),
+        )
+        self.assertTrue(accepted.allowed)
+        rejected = harness.validate_model_context("outcomes_intelligence", ("learner_private_reference",))
+        self.assertFalse(rejected.allowed)
+
+    def test_runtime_assurance_context_rejects_raw_graph_state(self):
+        harness = PlatformGraphHarness()
+        accepted = harness.validate_model_context(
+            "runtime_assurance",
+            ("aggregate_runtime_telemetry", "runtime_control_state", "telemetry_coverage"),
+        )
+        self.assertTrue(accepted.allowed)
+        rejected = harness.validate_model_context("runtime_assurance", ("raw_graph_state",))
+        self.assertFalse(rejected.allowed)
+        self.assertIn("forbidden", rejected.reason)
 
     def test_product_graph_cannot_execute_production_mutation(self):
         decision = PlatformGraphHarness().validate_dispatch(
@@ -231,6 +251,37 @@ class PlatformGraphHarnessTests(unittest.TestCase):
         )
         self.assertFalse(direct_store["allowed"])
         self.assertIn("direct handoff is not registered", direct_store["reason"])
+
+    def test_outcomes_signal_may_handoff_only_to_research(self):
+        harness = PlatformGraphHarness()
+        research = harness.validate_handoff(
+            source_work_type="outcomes_intelligence",
+            target_kind="graph",
+            target_id="canadian-work-research",
+            payload_data_classes=("aggregate_outcomes", "outcome_signal"),
+        )
+        self.assertTrue(research["allowed"])
+        direct_store = harness.validate_handoff(
+            source_work_type="outcomes_intelligence",
+            target_kind="store",
+            target_id="work-intelligence",
+            payload_data_classes=("outcome_signal",),
+        )
+        self.assertFalse(direct_store["allowed"])
+
+    def test_runtime_assurance_may_handoff_problem_to_product_not_mutate_production(self):
+        harness = PlatformGraphHarness()
+        product = harness.validate_handoff(
+            source_work_type="runtime_assurance",
+            target_kind="graph",
+            target_id="product-development",
+            payload_data_classes=("runtime_assurance_signal", "telemetry_coverage"),
+        )
+        self.assertTrue(product["allowed"])
+        mutation = harness.validate_dispatch(
+            DispatchRequest("runtime_assurance", "execute", "production_mutation", ("aggregate_runtime_telemetry",))
+        )
+        self.assertFalse(mutation.allowed)
 
     def test_learner_to_career_handoff_requires_accepted_evidence_boundary(self):
         harness = PlatformGraphHarness()
