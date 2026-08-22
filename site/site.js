@@ -4,12 +4,26 @@
 
   document.querySelectorAll(".footer-legal-note").forEach((note) => note.remove());
 
+  const programRoutes = {
+    "Applied AI": "/applied-ai",
+    "Cybersecurity GRC": "/cybersecurity-grc",
+    "AI Governance": "/ai-governance",
+    "Cloud": "/cloud",
+  };
+  document.querySelectorAll(".footer-column").forEach((column) => {
+    const heading = column.querySelector("strong");
+    if (!heading || heading.textContent.trim() !== "Programs") return;
+    column.querySelectorAll("a").forEach((link) => {
+      const route = programRoutes[link.textContent.trim()];
+      if (route) link.setAttribute("href", route);
+    });
+  });
+
   const toggle = document.querySelector("[data-menu-toggle]");
   const nav = document.querySelector("[data-primary-nav]");
   if (!toggle || !nav) return;
 
-  const usesReferenceShell = document.body.classList.contains("reference-home") || document.body.classList.contains("reference-page");
-  const menuBreakpoint = usesReferenceShell ? 860 : 760;
+  const menuBreakpoint = 760;
 
   const setMenuState = (open, returnFocus = false) => {
     toggle.setAttribute("aria-expanded", String(open));
