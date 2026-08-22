@@ -7,6 +7,8 @@
 
   if (!toggle || !nav) return;
 
+  const menuBreakpoint = document.body.classList.contains("reference-home") ? 860 : 760;
+
   const setMenuState = (open, returnFocus = false) => {
     toggle.setAttribute("aria-expanded", String(open));
     toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
@@ -31,6 +33,6 @@
   });
 
   window.addEventListener("resize", () => {
-    if (window.innerWidth > 760) setMenuState(false);
+    if (window.innerWidth > menuBreakpoint) setMenuState(false);
   });
 })();
