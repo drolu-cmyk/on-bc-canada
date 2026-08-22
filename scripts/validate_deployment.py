@@ -133,6 +133,20 @@ def validate_template() -> list[str]:
     if distribution_config.get("DefaultRootObject") != "index.html":
         errors.append("CloudFront default root object must be index.html")
 
+    origins = distribution_config.get("Origins", [])
+    if not origins:
+        errors.append("CloudFront must define a private S3 origin")
+    else:
+        public_origin = next((origin for origin in origins if origin.get("Id") == "PublicSiteOrigin"), None)
+        if public_origin is None:
+            errors.append("CloudFront must define PublicSiteOrigin")
+        else:
+            if public_origin.get("OriginAccessControlId") != {"Ref": "PublicSiteOriginAccessControl"}:
+                errors.append("CloudFront S3 origin must use PublicSiteOriginAccessControl")
+            s3_origin_config = public_origin.get("S3OriginConfig")
+            if s3_origin_config != {"OriginAccessIdentity": ""}:
+                errors.append("CloudFront OAC S3 origin must set OriginAccessIdentity to an empty string")
+
     behavior = distribution_config.get("DefaultCacheBehavior", {})
     if behavior.get("AllowedMethods") != ["GET", "HEAD"]:
         errors.append("public site cache behavior must allow GET and HEAD only")
@@ -145,8 +159,6 @@ def validate_template() -> list[str]:
     }
     if expected_association not in associations:
         errors.append("CloudFront viewer request must invoke LegacyDomainRedirectFunction")
-    if not distribution_config.get("Origins"):
-        errors.append("CloudFront must define a private S3 origin")
     return errors
 
 
