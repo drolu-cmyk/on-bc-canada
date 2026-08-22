@@ -9,8 +9,10 @@ from runtime.career_mobility_graph import CareerMobilityGraph
 from runtime.employer_workforce_graph import EmployerWorkforceGraph
 from runtime.graph_kernel import GraphDefinition
 from runtime.learner_execution_graph import LearnerExecutionGraph
+from runtime.outcomes_intelligence_graph import OutcomesIntelligenceGraph
 from runtime.product_development_graph import ProductDevelopmentGraph
 from runtime.research_graph import ResearchGraph
+from runtime.runtime_assurance_graph import RuntimeAssuranceGraph
 
 
 STORE_IDS = {
@@ -282,6 +284,54 @@ GRAPH_CONTRACTS: dict[str, GraphContract] = {
         notes=(
             "The graph makes no individual employment decision.",
             "Employer capability signals require Research Intelligence validation before Work Intelligence can change.",
+        ),
+    ),
+    "outcomes_intelligence": GraphContract(
+        work_type="outcomes_intelligence",
+        graph_id="outcomes-intelligence",
+        graph_version="0.1.0",
+        purpose="Interpret privacy-released aggregate programme outcomes and prepare research questions when material signals survive challenge.",
+        definition_factory=OutcomesIntelligenceGraph.definition,
+        runtime_data_classes=("aggregate_outcomes", "measurement_metadata", "outcome_signal"),
+        model_data_classes=("aggregate_outcomes", "measurement_metadata"),
+        forbidden_data_classes=COMMON_FORBIDDEN_MODEL_DATA + ("cohort_identifier", "learner_private_reference"),
+        autonomous_effects=("analysis", "prepare", "internal_record"),
+        handoffs=(
+            HandoffRule(
+                target_kind="graph",
+                target_id="canadian-work-research",
+                payload_data_classes=("aggregate_outcomes", "outcome_signal"),
+                prerequisite="Only privacy-released aggregate outcomes may produce a question, and the signal must survive the Outcomes Challenge Agent. Research Intelligence must independently validate it before any Work Intelligence or curriculum change.",
+            ),
+        ),
+        terminal_record="outcomes_packet",
+        notes=(
+            "No learner-level ranking, cohort-level model analysis, or demographic segmentation is permitted in the launch contract.",
+            "Outcome signals are research inputs, not evidence that curriculum should change.",
+        ),
+    ),
+    "runtime_assurance": GraphContract(
+        work_type="runtime_assurance",
+        graph_id="runtime-assurance",
+        graph_version="0.1.0",
+        purpose="Interpret aggregate graph execution and control telemetry for reliability, control integrity, and human intervention recommendations.",
+        definition_factory=RuntimeAssuranceGraph.definition,
+        runtime_data_classes=("aggregate_runtime_telemetry", "runtime_control_state", "telemetry_coverage"),
+        model_data_classes=("aggregate_runtime_telemetry", "runtime_control_state", "telemetry_coverage"),
+        forbidden_data_classes=COMMON_FORBIDDEN_MODEL_DATA + ("raw_graph_state", "prompt_content", "model_output_content", "credential_material"),
+        autonomous_effects=("analysis", "prepare", "internal_record"),
+        handoffs=(
+            HandoffRule(
+                target_kind="graph",
+                target_id="product-development",
+                payload_data_classes=("runtime_assurance_signal", "telemetry_coverage"),
+                prerequisite="A runtime issue may become a product-development problem statement only; Product Development still cannot deploy or mutate production without its existing A3 release authorization boundary.",
+            ),
+        ),
+        terminal_record="runtime_assurance_packet",
+        notes=(
+            "Runtime Assurance cannot disable agents, change authority or tools, change runtime limits, deploy code, or mutate infrastructure.",
+            "Missing telemetry is reported as a coverage gap, never interpreted as healthy operation.",
         ),
     ),
 }
