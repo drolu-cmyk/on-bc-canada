@@ -6,9 +6,9 @@ from dataclasses import replace
 from pathlib import Path
 
 from runtime.graph_execution_store import GraphExecutionStore
-from runtime.learner_assessment_runner import start_learner_assessment
+from runtime.learner_execution_runner import start_learner_assessment
 from runtime.learner_progress_store import LearnerProgressStore
-from runtime.test_learner_assessment_graph import FakeProvider
+from runtime.test_learner_execution_graph import FakeLearnerProvider
 from runtime.test_learner_progress_store import build_learning_fixture
 
 
@@ -92,23 +92,21 @@ class LearnerStateIntegrityTests(unittest.TestCase):
         submission = self.advance_and_submit("submission-integrity-assess")
         store = GraphExecutionStore(self.root / "assessment.sqlite3")
         start_learner_assessment(
-            provider=FakeProvider(),
+            provider=FakeLearnerProvider(),
             execution_store=store,
             progress_store=self.progress,
             capability_store=self.capabilities,
             execution_id="assessment-integrity-001",
             submission_id=submission["submission_id"],
-            evidence_material=[],
         )
         with self.assertRaisesRegex(ValueError, "newly submitted"):
             start_learner_assessment(
-                provider=FakeProvider(),
+                provider=FakeLearnerProvider(),
                 execution_store=store,
                 progress_store=self.progress,
                 capability_store=self.capabilities,
                 execution_id="assessment-integrity-002",
                 submission_id=submission["submission_id"],
-                evidence_material=[],
             )
 
     def test_path_completion_event_follows_evidence_acceptance_event(self):
