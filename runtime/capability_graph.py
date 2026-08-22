@@ -258,8 +258,8 @@ class CapabilityGraphStore:
                 "SELECT status FROM capabilities WHERE capability_id = ?",
                 (definition.capability_id,),
             ).fetchone()
-            if existing and existing["status"] == "active":
-                raise ValueError("active capability definitions cannot be overwritten by an agent draft")
+            if existing and existing["status"] in {"active", "retired"}:
+                raise ValueError("active or retired capability definitions cannot be overwritten by an agent draft")
 
             for prerequisite_id in definition.prerequisite_ids:
                 prerequisite = connection.execute(

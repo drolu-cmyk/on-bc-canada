@@ -53,17 +53,27 @@ The default local database is `local-data/research.sqlite3`. `local-data/` is ig
 
 `capability_graph.py` defines the learner capability layer beneath modules and delivery content. Work Intelligence must first support the capability. A candidate capability then carries an observable description, target proficiency, evidence standards, prerequisites, and exact Work Intelligence provenance.
 
-A capability becomes active only after a named human decision. Deterministic checks require evidence standards, provenance, and active prerequisites. Active capability definitions cannot be replaced by an agent-authored candidate, and retirement is blocked while another active capability depends on the capability.
+A capability becomes active only after a named human decision. Deterministic checks require evidence standards, provenance, and active prerequisites. Active or retired capability definitions cannot be replaced by an agent-authored candidate, and retirement is blocked while another active capability depends on the capability.
 
 `run_capability_graph.py` provides command operations for evidence-backed candidate creation, activation, retirement, inspection, and pathway listing. Local reference data defaults under `local-data/` and does not belong in source control.
 
-Install the agent runtime dependencies before live research use:
+## Learning graph
+
+`learning_graph.py` maps active capabilities to sprints, labs, missions, prerequisite edges, and mission evidence requirements. It validates active capability status, pathway ownership, accepted evidence-standard identifiers, mission coverage, and acyclic learning-unit dependencies before a candidate path can be stored.
+
+A mission is the only unit type that can carry final capability evidence requirements. Sprints teach focused concepts and methods. Labs provide bounded practice. Every target capability must have mission evidence coverage before a path can reach human review.
+
+`openai_learning_provider.py` supplies a typed Learning Graph Design Agent. It receives reviewed capability records and optional summaries of existing modules. It has no web-search tool and cannot create new capability or evidence-standard identifiers. Its output remains a candidate until `learning_graph.py` validates it and a named human activates the path.
+
+`run_learning_graph.py` provides command operations for agent-assisted design, activation, retirement, inspection, and active-path lookup. Only one learning-path version may be active for a pathway at a time.
+
+Install the agent runtime dependencies before live agent use:
 
 ```bash
 python -m pip install -r runtime/requirements-agentic.txt
 ```
 
-A live research run additionally requires `OPENAI_API_KEY`. Secrets do not belong in the repository.
+A live agent run additionally requires `OPENAI_API_KEY`. Secrets do not belong in the repository.
 
 Start research inside one launch domain:
 
@@ -97,4 +107,4 @@ Run the tests from the repository root:
 python -m unittest discover -s runtime -p 'test_*.py' -v
 ```
 
-The test suite does not make live model calls. It checks graph execution, persistence, stop-and-resume behavior, domain specialization, provider contracts, Work Intelligence, Capability Graph authority, command boundaries, and installed SDK construction.
+The test suite does not make live model calls. It checks graph execution, persistence, stop-and-resume behavior, domain specialization, provider contracts, Work Intelligence, Capability Graph authority, Learning Graph sequence and evidence rules, command boundaries, and installed SDK construction.
