@@ -9,6 +9,11 @@ import sys
 import uuid
 from pathlib import Path
 
+from runtime.aws_runtime_observability import (
+    CloudWatchRuntimeTelemetrySource,
+    apply_cloudwatch_runtime_to_snapshot,
+    aws_observability_enabled,
+)
 from runtime.graph_execution_store import GraphExecutionStore
 from runtime.model_runtime_telemetry import telemetry_db_path
 from runtime.openai_runtime_assurance_provider import OpenAIRuntimeAssuranceProvider
@@ -26,6 +31,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--execution-db", default=str(DEFAULT_EXECUTION_DB))
     parser.add_argument("--research-db", default=str(DEFAULT_RESEARCH_DB))
     parser.add_argument("--telemetry-db", default=str(DEFAULT_TELEMETRY_DB))
+    parser.add_argument(
+        "--telemetry-source",
+        choices=("local", "aws"),
+        default="aws" if aws_observability_enabled() else "local",
+        help="Read model runtime telemetry from local SQLite or centralized AWS CloudWatch Logs.",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     start = subparsers.add_parser("start", help="Build aggregate runtime telemetry and analyze it.")
@@ -42,23 +53,29 @@ def _provider() -> OpenAIRuntimeAssuranceProvider:
     return OpenAIRuntimeAssuranceProvider()
 
 
+def _snapshot(args: argparse.Namespace) -> dict[str, object]:
+    sources = (
+        RuntimeStoreSource(args.execution_db, "generic_graph"),
+        RuntimeStoreSource(args.research_db, "research"),
+    )
+    if args.telemetry_source == "local":
+        return RuntimeAssuranceSnapshotBuilder(sources, model_telemetry_path=args.telemetry_db).build()
+
+    base = RuntimeAssuranceSnapshotBuilder(sources).build()
+    cloud_runtime = CloudWatchRuntimeTelemetrySource().read()
+    return apply_cloudwatch_runtime_to_snapshot(base, cloud_runtime)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     store = GraphExecutionStore(args.execution_db)
     try:
         if args.command == "start":
-            snapshot = RuntimeAssuranceSnapshotBuilder(
-                (
-                    RuntimeStoreSource(args.execution_db, "generic_graph"),
-                    RuntimeStoreSource(args.research_db, "research"),
-                ),
-                model_telemetry_path=args.telemetry_db,
-            ).build()
             execution = start_runtime_assurance(
                 provider=_provider(),
                 execution_store=store,
                 execution_id=args.execution_id or f"runtime-assurance-{uuid.uuid4().hex[:12]}",
-                snapshot=snapshot,
+                snapshot=_snapshot(args),
             )
         else:
             execution, _ = store.load_execution(args.execution_id)
