@@ -74,6 +74,11 @@ class LearningUnit:
             raise ValueError("duplicate evidence requirements are not allowed")
         if self.evidence_requirements and self.kind != "mission":
             raise ValueError("evidence standards for capability verification must be attached to missions")
+        undeveloped = {
+            item.capability_id for item in self.evidence_requirements
+        } - set(self.develops_capability_ids)
+        if undeveloped:
+            raise ValueError(f"mission cannot assess capabilities it does not develop: {sorted(undeveloped)}")
 
 
 @dataclass(frozen=True)
@@ -228,8 +233,8 @@ class LearningGraphStore:
                 "SELECT status FROM learning_paths WHERE pathway_id = ? AND version = ?",
                 (definition.pathway_id, definition.version),
             ).fetchone()
-            if existing and existing["status"] == "active":
-                raise ValueError("an active learning path version cannot be replaced by an agent candidate")
+            if existing and existing["status"] in {"active", "retired"}:
+                raise ValueError("an active or retired learning path version cannot be replaced by an agent candidate")
 
             connection.execute(
                 """
@@ -262,6 +267,8 @@ class LearningGraphStore:
                     (definition.pathway_id, definition.version, capability_id),
                 )
 
+            # Write all unit rows before prerequisite edges so input order never
+            # changes foreign-key validity.
             for unit in definition.units:
                 connection.execute(
                     """
@@ -279,6 +286,8 @@ class LearningGraphStore:
                         _dumps(list(unit.source_module_ids)),
                     ),
                 )
+
+            for unit in definition.units:
                 for capability_id in unit.develops_capability_ids:
                     connection.execute(
                         """
