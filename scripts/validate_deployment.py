@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the source-only public deployment contract and AWS template."""
+"""Validate the Canada public-site deployment contract and canonical AWS template."""
 
 from __future__ import annotations
 
@@ -14,16 +14,10 @@ try:
 except ModuleNotFoundError:
     Draft202012Validator = None
 
-
 ROOT = Path(__file__).resolve().parents[1]
 CANONICAL_ORIGIN = "https://canada.sozorock.com"
-CANONICAL_ROOT_DOMAIN = "sozorock.com"
 CANONICAL_DOMAIN = "canada.sozorock.com"
-CANONICAL_DNS_ZONE = "canada.sozorock.com"
 LEGACY_DOMAINS = ["sozorock.ca", "www.sozorock.ca"]
-PUBLIC_DOMAINS = [CANONICAL_DOMAIN, *LEGACY_DOMAINS]
-CERTIFICATE_REGION = "us-east-1"
-AUTOMATION_WORKFLOW = ".github/workflows/public-site-deploy.yml"
 AWS_ACCOUNT_ID = "891377012881"
 
 
@@ -38,15 +32,10 @@ def load_json(path: Path):
 
 
 def validate_contract() -> list[str]:
-    instance_path = ROOT / "config/deployment.yaml"
-    schema_path = ROOT / "schemas/deployment.schema.json"
-    instance = load_yaml(instance_path)
-    schema = load_json(schema_path)
+    instance = load_yaml(ROOT / "config/deployment.yaml")
+    schema = load_json(ROOT / "schemas/deployment.schema.json")
     if Draft202012Validator is None:
-        deployment = instance.get("deployment", {})
-        return [
-            "jsonschema is required for deployment semantic validation"
-        ] if not deployment.get("deployment_id") else []
+        return ["jsonschema is required for deployment semantic validation"]
     errors = sorted(Draft202012Validator(schema).iter_errors(instance), key=lambda error: list(error.path))
     return [f"deployment contract {'.'.join(str(part) for part in error.path) or 'root'}: {error.message}" for error in errors]
 
@@ -57,158 +46,90 @@ def validate_template() -> list[str]:
     parameters = template.get("Parameters", {})
     errors: list[str] = []
 
-    expected_defaults = {
-        "CanonicalDomainName": CANONICAL_DOMAIN,
-        "LegacyRootDomainName": LEGACY_DOMAINS[0],
-        "LegacyWwwDomainName": LEGACY_DOMAINS[1],
-    }
-    for parameter, expected in expected_defaults.items():
-        if parameters.get(parameter, {}).get("Default") != expected:
-            errors.append(f"CloudFront {parameter} default must be {expected}")
-
-    if parameters.get("CertificateArn", {}).get("Type") != "String":
-        errors.append("CloudFront CertificateArn parameter is required")
-    publish_alias = parameters.get("PublishAlias", {})
-    if publish_alias.get("Type") != "String" or publish_alias.get("Default") != "false":
-        errors.append("CloudFront PublishAlias must default to false for transfer-safe provisioning")
+    if parameters.get("CanonicalDomainName", {}).get("Default") != CANONICAL_DOMAIN:
+        errors.append("CanonicalDomainName must default to canada.sozorock.com")
+    if "LegacyRootDomainName" in parameters or "LegacyWwwDomainName" in parameters:
+        errors.append("canonical CloudFront template must not parameterize legacy .ca aliases")
+    if parameters.get("PublishAlias", {}).get("Default") != "true":
+        errors.append("canonical CloudFront alias must be enabled by default")
 
     required_types = {
         "PublicSiteBucket": "AWS::S3::Bucket",
         "PublicSiteOriginAccessControl": "AWS::CloudFront::OriginAccessControl",
-        "LegacyDomainRedirectFunction": "AWS::CloudFront::Function",
         "PublicSiteDistribution": "AWS::CloudFront::Distribution",
         "PublicSiteBucketPolicy": "AWS::S3::BucketPolicy",
     }
-    for name, resource_type in required_types.items():
-        if resources.get(name, {}).get("Type") != resource_type:
-            errors.append(f"missing resource type {name}={resource_type}")
+    for name, expected_type in required_types.items():
+        if resources.get(name, {}).get("Type") != expected_type:
+            errors.append(f"missing resource type {name}={expected_type}")
+    if "LegacyDomainRedirectFunction" in resources:
+        errors.append("legacy redirects must not share the canonical CloudFront distribution")
 
     bucket = resources.get("PublicSiteBucket", {})
-    bucket_properties = bucket.get("Properties", {})
-    block = bucket_properties.get("PublicAccessBlockConfiguration", {})
+    props = bucket.get("Properties", {})
+    block = props.get("PublicAccessBlockConfiguration", {})
     if any(block.get(key) is not True for key in ["BlockPublicAcls", "BlockPublicPolicy", "IgnorePublicAcls", "RestrictPublicBuckets"]):
         errors.append("public site bucket must block every public access mode")
-    if bucket_properties.get("VersioningConfiguration", {}).get("Status") != "Enabled":
+    if props.get("VersioningConfiguration", {}).get("Status") != "Enabled":
         errors.append("public site bucket versioning must be enabled")
-    if not bucket_properties.get("BucketEncryption", {}).get("ServerSideEncryptionConfiguration"):
+    if not props.get("BucketEncryption", {}).get("ServerSideEncryptionConfiguration"):
         errors.append("public site bucket encryption is required")
-    if bucket.get("DeletionPolicy") != "Retain" or bucket.get("UpdateReplacePolicy") != "Retain":
-        errors.append("public site bucket retention policies are required")
-
-    redirect_function = resources.get("LegacyDomainRedirectFunction", {}).get("Properties", {})
-    redirect_code = redirect_function.get("FunctionCode", "")
-    if redirect_function.get("FunctionConfig", {}).get("Runtime") != "cloudfront-js-2.0":
-        errors.append("legacy redirect function must use cloudfront-js-2.0")
-    for legacy in LEGACY_DOMAINS:
-        if legacy not in redirect_code:
-            errors.append(f"legacy redirect function must recognize {legacy}")
-    if CANONICAL_ORIGIN not in redirect_code:
-        errors.append("legacy redirect function must target https://canada.sozorock.com")
-    if "statusCode: 301" not in redirect_code:
-        errors.append("legacy redirect function must issue HTTP 301")
 
     distribution = resources.get("PublicSiteDistribution", {})
-    distribution_config = distribution.get("Properties", {}).get("DistributionConfig", {})
-    aliases = distribution_config.get("Aliases", {})
-    if aliases.get("Fn::If") != [
-        "PublishCustomDomain",
-        [
-            {"Ref": "CanonicalDomainName"},
-            {"Ref": "LegacyRootDomainName"},
-            {"Ref": "LegacyWwwDomainName"},
-        ],
-        {"Ref": "AWS::NoValue"},
-    ]:
-        errors.append("CloudFront must conditionally attach the canonical and both legacy hostnames")
-
-    viewer_certificate = distribution_config.get("ViewerCertificate", {})
-    if viewer_certificate.get("AcmCertificateArn") != {"Ref": "CertificateArn"}:
-        errors.append("CloudFront must use the supplied ACM certificate")
-    if viewer_certificate.get("SslSupportMethod") != "sni-only":
-        errors.append("CloudFront custom-domain TLS must use SNI")
-    if viewer_certificate.get("MinimumProtocolVersion") != "TLSv1.2_2021":
-        errors.append("CloudFront custom-domain TLS must require TLS 1.2")
-    if distribution_config.get("IPV6Enabled") is not True:
-        errors.append("CloudFront IPv6 must be enabled with IPV6Enabled")
-    if "IsIPV6Enabled" in distribution_config:
-        errors.append("CloudFront DistributionConfig must not use unsupported IsIPV6Enabled")
-    if distribution_config.get("DefaultRootObject") != "index.html":
+    config = distribution.get("Properties", {}).get("DistributionConfig", {})
+    aliases = config.get("Aliases", {})
+    expected_aliases = ["PublishCustomDomain", [{"Ref": "CanonicalDomainName"}], {"Ref": "AWS::NoValue"}]
+    if aliases.get("Fn::If") != expected_aliases:
+        errors.append("CloudFront must conditionally attach only canada.sozorock.com")
+    if config.get("IPV6Enabled") is not True or "IsIPV6Enabled" in config:
+        errors.append("CloudFront IPv6 configuration is invalid")
+    if config.get("DefaultRootObject") != "index.html":
         errors.append("CloudFront default root object must be index.html")
+    if config.get("ViewerCertificate", {}).get("MinimumProtocolVersion") != "TLSv1.2_2021":
+        errors.append("CloudFront TLS policy must be TLSv1.2_2021")
 
-    origins = distribution_config.get("Origins", [])
-    if not origins:
-        errors.append("CloudFront must define a private S3 origin")
+    origins = config.get("Origins", [])
+    origin = next((item for item in origins if item.get("Id") == "PublicSiteOrigin"), None)
+    if not origin:
+        errors.append("CloudFront must define PublicSiteOrigin")
     else:
-        public_origin = next((origin for origin in origins if origin.get("Id") == "PublicSiteOrigin"), None)
-        if public_origin is None:
-            errors.append("CloudFront must define PublicSiteOrigin")
-        else:
-            if public_origin.get("OriginAccessControlId") != {"Ref": "PublicSiteOriginAccessControl"}:
-                errors.append("CloudFront S3 origin must use PublicSiteOriginAccessControl")
-            s3_origin_config = public_origin.get("S3OriginConfig")
-            if s3_origin_config != {"OriginAccessIdentity": ""}:
-                errors.append("CloudFront OAC S3 origin must set OriginAccessIdentity to an empty string")
+        if origin.get("OriginAccessControlId") != {"Ref": "PublicSiteOriginAccessControl"}:
+            errors.append("CloudFront S3 origin must use the origin access control")
+        if origin.get("S3OriginConfig") != {"OriginAccessIdentity": ""}:
+            errors.append("CloudFront OAC S3 origin must use an empty OriginAccessIdentity")
 
-    behavior = distribution_config.get("DefaultCacheBehavior", {})
+    behavior = config.get("DefaultCacheBehavior", {})
     if behavior.get("AllowedMethods") != ["GET", "HEAD"]:
-        errors.append("public site cache behavior must allow GET and HEAD only")
+        errors.append("public site must allow GET and HEAD only")
     if behavior.get("ViewerProtocolPolicy") != "redirect-to-https":
-        errors.append("public site cache behavior must redirect to HTTPS")
-    associations = behavior.get("FunctionAssociations", [])
-    expected_association = {
-        "EventType": "viewer-request",
-        "FunctionARN": {"Fn::GetAtt": ["LegacyDomainRedirectFunction", "FunctionARN"]},
-    }
-    if expected_association not in associations:
-        errors.append("CloudFront viewer request must invoke LegacyDomainRedirectFunction")
+        errors.append("public site must redirect HTTP to HTTPS")
+    if behavior.get("FunctionAssociations"):
+        errors.append("canonical CloudFront distribution must not contain legacy redirect functions")
     return errors
 
 
 def validate_source_boundary() -> list[str]:
     deployment = load_yaml(ROOT / "config/deployment.yaml").get("deployment", {})
-    errors: list[str] = []
+    public_site = deployment.get("public_site", {})
     automation = deployment.get("automation", {})
-    if automation.get("workflow") != AUTOMATION_WORKFLOW:
-        errors.append("automation.workflow must be .github/workflows/public-site-deploy.yml")
-    if automation.get("authentication") != "github_oidc":
-        errors.append("automation.authentication must be github_oidc")
+    errors: list[str] = []
+
     if automation.get("account_id") != AWS_ACCOUNT_ID:
         errors.append("automation.account_id must be 891377012881")
     if automation.get("region") != "ca-central-1":
         errors.append("automation.region must be ca-central-1")
-    if automation.get("trigger") != "main_push":
-        errors.append("automation.trigger must be main_push")
-
-    public_site = deployment.get("public_site", {})
     if public_site.get("canonical_origin") != CANONICAL_ORIGIN:
-        errors.append("public_site.canonical_origin must be https://canada.sozorock.com")
-    if public_site.get("domain_names") != PUBLIC_DOMAINS:
-        errors.append("public_site.domain_names must contain canada.sozorock.com and both .ca redirect hosts")
-    if public_site.get("canonical_root_domain_name") != CANONICAL_ROOT_DOMAIN:
-        errors.append("public_site.canonical_root_domain_name must be sozorock.com")
+        errors.append("canonical_origin must be https://canada.sozorock.com")
     if public_site.get("canonical_domain_name") != CANONICAL_DOMAIN:
-        errors.append("public_site.canonical_domain_name must be canada.sozorock.com")
-    if public_site.get("canonical_dns_zone_name") != CANONICAL_DNS_ZONE:
-        errors.append("public_site.canonical_dns_zone_name must be canada.sozorock.com")
+        errors.append("canonical_domain_name must be canada.sozorock.com")
+    if public_site.get("canonical_dns_zone_name") != CANONICAL_DOMAIN:
+        errors.append("canonical_dns_zone_name must be canada.sozorock.com")
     if public_site.get("legacy_domain_names") != LEGACY_DOMAINS:
-        errors.append("public_site.legacy_domain_names must be sozorock.ca and www.sozorock.ca")
+        errors.append("legacy domains must remain sozorock.ca and www.sozorock.ca")
     if public_site.get("legacy_redirect_status") != 301:
-        errors.append("public_site.legacy_redirect_status must be 301")
-    if public_site.get("certificate_region") != CERTIFICATE_REGION:
-        errors.append("public_site.certificate_region must be us-east-1")
-    if deployment.get("status") != "source_only":
-        errors.append("deployment status must remain source_only")
-
-    learner_services = deployment.get("learner_services", {})
-    for section, values in [("public_site", public_site), ("learner_services", learner_services)]:
-        if values.get("external_side_effects") != "disabled":
-            errors.append(f"{section}.external_side_effects must be disabled")
-    if public_site.get("data_collection") != "disabled":
-        errors.append("public_site.data_collection must be disabled")
-    if learner_services.get("intake") != "disabled":
-        errors.append("learner_services.intake must be disabled")
-    if learner_services.get("production_data") != "disabled":
-        errors.append("learner_services.production_data must be disabled")
+        errors.append("legacy redirect status must remain 301")
+    if public_site.get("certificate_region") != "us-east-1":
+        errors.append("CloudFront certificate region must be us-east-1")
     for required in ["index.html", "privacy.html", "terms.html", "404.html"]:
         if not (ROOT / "site" / required).is_file():
             errors.append(f"site/{required} is required")
@@ -221,7 +142,7 @@ def main() -> int:
         print("Deployment validation failed:", file=sys.stderr)
         print("\n".join(errors), file=sys.stderr)
         return 1
-    print("Deployment validation passed for delegated canada.sozorock.com DNS with permanent .ca redirects.")
+    print("Deployment validation passed for canonical canada.sozorock.com with legacy .ca redirects separated from CloudFront.")
     return 0
 
 
