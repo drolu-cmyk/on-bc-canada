@@ -92,9 +92,22 @@ Evaluator = Callable[[dict[str, Any], NodeResult], tuple[bool, str]]
 class GraphKernel:
     """Execute one graph deterministically around injected reasoning handlers."""
 
-    def __init__(self, *, program_id: str = "applied-ai-training-canada", ledger: EventLedger | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        program_id: str = "applied-ai-training-canada",
+        ledger: EventLedger | None = None,
+        event_privacy_class: str = "internal_operational",
+        event_retention_class: str = "quality_record",
+        event_learner_id: str | None = None,
+        event_cohort_id: str | None = None,
+    ) -> None:
         self.program_id = program_id
         self.ledger = ledger or EventLedger()
+        self.event_privacy_class = event_privacy_class
+        self.event_retention_class = event_retention_class
+        self.event_learner_id = event_learner_id
+        self.event_cohort_id = event_cohort_id
         self.handlers: dict[str, Handler] = {}
         self.evaluators: dict[str, Evaluator] = {}
         self.executions: dict[str, GraphExecution] = {}
@@ -265,8 +278,10 @@ class GraphKernel:
             correlation_id=f"corr-{execution.execution_id}",
             idempotency_key=f"graph:{execution.execution_id}:{event_type}:{sequence}",
             payload={"graph_id": execution.graph_id, "graph_version": execution.graph_version, **payload},
-            privacy_class="internal_operational",
-            retention_class="quality_record",
+            learner_id=self.event_learner_id,
+            cohort_id=self.event_cohort_id,
+            privacy_class=self.event_privacy_class,
+            retention_class=self.event_retention_class,
         )
 
     def _fail(self, execution: GraphExecution, reason: str) -> GraphExecution:
