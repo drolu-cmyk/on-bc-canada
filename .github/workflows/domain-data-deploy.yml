@@ -1,0 +1,103 @@
+name: Deploy PostgreSQL domain data plane to AWS Canada
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply_migrations:
+        description: Apply reviewed PostgreSQL migrations after infrastructure deployment
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install validators and runtime dependencies
+        run: python -m pip install --disable-pip-version-check pyyaml jsonschema -r runtime/requirements-agentic.txt
+      - name: Validate PostgreSQL domain data contract
+        run: python scripts/validate_domain_data.py
+      - name: Check deployment script syntax
+        run: bash -n scripts/deploy_domain_data.sh
+      - name: Run domain data tests
+        run: python -m unittest discover -s runtime -p 'test_*domain*.py' -v
+
+  deploy:
+    if: vars.DOMAIN_DATA_DEPLOYMENT_ENABLED == 'true' && vars.DOMAIN_DATA_DEPLOY_ROLE_ARN != ''
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials with GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v6.2.3
+        with:
+          role-to-assume: ${{ vars.DOMAIN_DATA_DEPLOY_ROLE_ARN }}
+          aws-region: ca-central-1
+          role-session-name: sozorock-ca-domain-${{ github.run_id }}
+          allowed-account-ids: "891377012881"
+      - name: Deploy private Aurora infrastructure
+        env:
+          AWS_ACCOUNT_ID: "891377012881"
+          AWS_REGION: ca-central-1
+          DOMAIN_DATA_STACK_NAME: sozorock-ca-domain-data
+          DOMAIN_DATA_ENVIRONMENT: pilot
+          DOMAIN_DATA_CLUSTER_IDENTIFIER: sozorock-ca-domain-data
+          DOMAIN_DATA_DATABASE: sozorockcanada
+          DOMAIN_DATA_ENGINE_VERSION: "16.8"
+        run: bash scripts/deploy_domain_data.sh
+
+  migrate:
+    if: inputs.apply_migrations == true && vars.DOMAIN_DATA_MIGRATIONS_ENABLED == 'true' && vars.DOMAIN_DATA_MIGRATION_ROLE_ARN != ''
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install migration dependencies
+        run: python -m pip install --disable-pip-version-check -r runtime/requirements-agentic.txt
+      - name: Configure migration credentials with GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v6.2.3
+        with:
+          role-to-assume: ${{ vars.DOMAIN_DATA_MIGRATION_ROLE_ARN }}
+          aws-region: ca-central-1
+          role-session-name: sozorock-ca-domain-migrate-${{ github.run_id }}
+          allowed-account-ids: "891377012881"
+      - name: Load non-secret stack identifiers
+        id: stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          stack=sozorock-ca-domain-data
+          region=ca-central-1
+          out(){ aws cloudformation describe-stacks --region "$region" --stack-name "$stack" --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
+          echo "cluster_arn=$(out DomainClusterArn)" >> "$GITHUB_OUTPUT"
+          echo "database=$(out DomainDatabaseName)" >> "$GITHUB_OUTPUT"
+          echo "master_secret=$(out MasterUserSecretArn)" >> "$GITHUB_OUTPUT"
+          echo "intelligence_secret=$(out IntelligenceRuntimeSecretArn)" >> "$GITHUB_OUTPUT"
+          echo "learning_secret=$(out LearningRuntimeSecretArn)" >> "$GITHUB_OUTPUT"
+      - name: Apply checksum-locked schema migrations and restricted roles
+        env:
+          SOZOROCK_DOMAIN_REGION: ca-central-1
+          SOZOROCK_DOMAIN_CLUSTER_ARN: ${{ steps.stack.outputs.cluster_arn }}
+          SOZOROCK_DOMAIN_DATABASE: ${{ steps.stack.outputs.database }}
+          SOZOROCK_DOMAIN_MASTER_SECRET_ARN: ${{ steps.stack.outputs.master_secret }}
+        run: |
+          python scripts/apply_domain_migrations.py \
+            --applied-by "github:${GITHUB_ACTOR}:${GITHUB_RUN_ID}" \
+            --intelligence-secret-arn "${{ steps.stack.outputs.intelligence_secret }}" \
+            --learning-secret-arn "${{ steps.stack.outputs.learning_secret }}"
