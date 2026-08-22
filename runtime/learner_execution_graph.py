@@ -244,11 +244,10 @@ class LearnerExecutionGraph:
             (item["capability_id"], item["standard_id"])
             for item in state["model_context"]["readiness_requirements"]
         }
-        returned = {
-            (item.get("capability_id"), item.get("standard_id")) for item in output.get("checklist", [])
-        }
-        if returned - allowed:
-            raise ValueError("human review preparation introduced an unknown capability evidence standard")
+        checklist = output.get("checklist", [])
+        returned = {(item.get("capability_id"), item.get("standard_id")) for item in checklist}
+        if returned != allowed or len(checklist) != len(returned):
+            raise ValueError("human review preparation must cover each required capability evidence standard exactly once")
         return NodeResult(patch={"review_checklist": output}, evidence=[{"type": "human_review_checklist"}])
 
     @staticmethod
