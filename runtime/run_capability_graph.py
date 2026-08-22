@@ -7,8 +7,8 @@ import os
 import sys
 from pathlib import Path
 
-from runtime.capability_graph import CapabilityGraphStore, EvidenceStandard
-from runtime.work_intelligence import WorkIntelligenceStore
+from runtime.capability_graph import EvidenceStandard
+from runtime.domain_store_factory import create_capability_store, create_work_intelligence_store
 
 
 DEFAULT_CAPABILITY_DB = Path(os.getenv("SOZOROCK_CAPABILITY_DB", "local-data/capabilities.sqlite3"))
@@ -19,11 +19,11 @@ STATUSES = ("draft", "active", "retired")
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Operate the reviewed learner Capability Graph.")
-    parser.add_argument("--db", default=str(DEFAULT_CAPABILITY_DB), help="Capability Graph SQLite path.")
-    parser.add_argument("--work-db", default=str(DEFAULT_WORK_DB), help="Work Intelligence SQLite path.")
+    parser.add_argument("--db", default=str(DEFAULT_CAPABILITY_DB), help="Local Capability Graph SQLite path when SOZOROCK_DOMAIN_BACKEND=local.")
+    parser.add_argument("--work-db", default=str(DEFAULT_WORK_DB), help="Local Work Intelligence SQLite path when SOZOROCK_DOMAIN_BACKEND=local.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    draft = subparsers.add_parser("draft-from-work", help="Create a draft capability from Work Intelligence evidence.")
+    draft = subparsers.add_parser("draft-from-work", help="Create a candidate capability from Work Intelligence evidence.")
     draft.add_argument("--pathway-id", required=True)
     draft.add_argument("--pathway-name", required=True)
     draft.add_argument("--capability-id", required=True)
@@ -38,7 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="JSON object containing standard_id, description, artifact_types, minimum_level, and optional defense/revision flags.",
     )
 
-    activate = subparsers.add_parser("activate", help="Activate a reviewed draft capability.")
+    activate = subparsers.add_parser("activate", help="Activate a reviewed candidate capability.")
     activate.add_argument("--capability-id", required=True)
     activate.add_argument("--approver-id", required=True)
     activate.add_argument("--note", default="")
@@ -54,7 +54,6 @@ def build_parser() -> argparse.ArgumentParser:
     pathway = subparsers.add_parser("pathway", help="List capability definitions for one pathway.")
     pathway.add_argument("--pathway-id", required=True)
     pathway.add_argument("--status", choices=STATUSES, default=None)
-
     return parser
 
 
@@ -75,11 +74,10 @@ def _parse_standard(raw: str) -> EvidenceStandard:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    store = CapabilityGraphStore(args.db)
-
+    store = create_capability_store(args.db)
     try:
         if args.command == "draft-from-work":
-            work_store = WorkIntelligenceStore(args.work_db)
+            work_store = create_work_intelligence_store(args.work_db)
             definition = store.draft_from_work_intelligence(
                 work_store=work_store,
                 pathway_id=args.pathway_id,
@@ -104,7 +102,7 @@ def main(argv: list[str] | None = None) -> int:
                 "status_filter": args.status,
                 "capabilities": store.list_pathway(args.pathway_id, status=args.status),
             }
-    except (json.JSONDecodeError, KeyError, ValueError) as exc:
+    except (json.JSONDecodeError, KeyError, RuntimeError, ValueError) as exc:
         print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
 
