@@ -1,0 +1,360 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Private Aurora PostgreSQL Serverless v2 domain data plane for SozoRock Canada workforce intelligence and reviewed learning records.",
+  "Parameters": {
+    "EnvironmentName": {
+      "Type": "String",
+      "Default": "pilot",
+      "AllowedPattern": "^[a-z0-9-]{2,32}$"
+    },
+    "ClusterIdentifier": {
+      "Type": "String",
+      "Default": "sozorock-ca-domain-data",
+      "AllowedPattern": "^[a-zA-Z](?:-?[a-zA-Z0-9]){0,62}$"
+    },
+    "DatabaseName": {
+      "Type": "String",
+      "Default": "sozorockcanada",
+      "AllowedPattern": "^[a-zA-Z][a-zA-Z0-9_]{0,62}$"
+    },
+    "EngineVersion": {
+      "Type": "String",
+      "Default": "16.8",
+      "AllowedPattern": "^16\\.[0-9]+$"
+    },
+    "MaxCapacity": {
+      "Type": "Number",
+      "Default": 2,
+      "MinValue": 0.5,
+      "MaxValue": 16
+    },
+    "SecondsUntilAutoPause": {
+      "Type": "Number",
+      "Default": 900,
+      "MinValue": 300,
+      "MaxValue": 86400
+    }
+  },
+  "Resources": {
+    "DomainVpc": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.44.0.0/24",
+        "EnableDnsHostnames": true,
+        "EnableDnsSupport": true,
+        "InstanceTenancy": "default",
+        "Tags": [
+          {"Key": "Name", "Value": {"Fn::Sub": "sozorock-ca-${EnvironmentName}-domain-vpc"}},
+          {"Key": "Project", "Value": "SozoRockCanada"},
+          {"Key": "Environment", "Value": {"Ref": "EnvironmentName"}}
+        ]
+      }
+    },
+    "DomainSubnetA": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {"Ref": "DomainVpc"},
+        "CidrBlock": "10.44.0.0/26",
+        "AvailabilityZone": {"Fn::Select": [0, {"Fn::GetAZs": ""}]},
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {"Key": "Name", "Value": {"Fn::Sub": "sozorock-ca-${EnvironmentName}-domain-a"}},
+          {"Key": "Project", "Value": "SozoRockCanada"}
+        ]
+      }
+    },
+    "DomainSubnetB": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {"Ref": "DomainVpc"},
+        "CidrBlock": "10.44.0.64/26",
+        "AvailabilityZone": {"Fn::Select": [1, {"Fn::GetAZs": ""}]},
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {"Key": "Name", "Value": {"Fn::Sub": "sozorock-ca-${EnvironmentName}-domain-b"}},
+          {"Key": "Project", "Value": "SozoRockCanada"}
+        ]
+      }
+    },
+    "DomainSubnetGroup": {
+      "Type": "AWS::RDS::DBSubnetGroup",
+      "Properties": {
+        "DBSubnetGroupDescription": "Private Canada Central subnets for the SozoRock domain data cluster.",
+        "SubnetIds": [
+          {"Ref": "DomainSubnetA"},
+          {"Ref": "DomainSubnetB"}
+        ],
+        "Tags": [
+          {"Key": "Project", "Value": "SozoRockCanada"},
+          {"Key": "Environment", "Value": {"Ref": "EnvironmentName"}}
+        ]
+      }
+    },
+    "DomainSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "No public or application-network ingress; domain access uses RDS Data API.",
+        "VpcId": {"Ref": "DomainVpc"},
+        "SecurityGroupIngress": [],
+        "SecurityGroupEgress": [],
+        "Tags": [
+          {"Key": "Name", "Value": {"Fn::Sub": "sozorock-ca-${EnvironmentName}-domain-db"}},
+          {"Key": "Project", "Value": "SozoRockCanada"}
+        ]
+      }
+    },
+    "DomainDataKey": {
+      "Type": "AWS::KMS::Key",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "Description": "Encrypt SozoRock Canada PostgreSQL domain data and database credentials.",
+        "EnableKeyRotation": true,
+        "KeyPolicy": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "EnableAccountAdministration",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {"Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"}
+              },
+              "Action": "kms:*",
+              "Resource": "*"
+            }
+          ]
+        },
+        "Tags": [
+          {"Key": "Project", "Value": "SozoRockCanada"},
+          {"Key": "Environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "DataClass", "Value": "controlled-domain-data"}
+        ]
+      }
+    },
+    "DomainDataKeyAlias": {
+      "Type": "AWS::KMS::Alias",
+      "Properties": {
+        "AliasName": {"Fn::Sub": "alias/sozorock-canada-${EnvironmentName}-domain-data"},
+        "TargetKeyId": {"Ref": "DomainDataKey"}
+      }
+    },
+    "IntelligenceRuntimeSecret": {
+      "Type": "AWS::SecretsManager::Secret",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "Name": {"Fn::Sub": "sozorock/canada/${EnvironmentName}/domain/intelligence-runtime"},
+        "Description": "Database credential for the intelligence schema runtime role. The role is created by the reviewed migration workflow.",
+        "KmsKeyId": {"Fn::GetAtt": ["DomainDataKey", "Arn"]},
+        "GenerateSecretString": {
+          "SecretStringTemplate": "{\"username\":\"sozorock_intelligence_rw\"}",
+          "GenerateStringKey": "password",
+          "PasswordLength": 40,
+          "ExcludeCharacters": "\"'\\/@`"
+        },
+        "Tags": [
+          {"Key": "Project", "Value": "SozoRockCanada"},
+          {"Key": "Environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "AccessProfile", "Value": "intelligence"}
+        ]
+      }
+    },
+    "LearningRuntimeSecret": {
+      "Type": "AWS::SecretsManager::Secret",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "Name": {"Fn::Sub": "sozorock/canada/${EnvironmentName}/domain/learning-runtime"},
+        "Description": "Database credential for the reviewed learning schema runtime role. The role is created by the reviewed migration workflow.",
+        "KmsKeyId": {"Fn::GetAtt": ["DomainDataKey", "Arn"]},
+        "GenerateSecretString": {
+          "SecretStringTemplate": "{\"username\":\"sozorock_learning_rw\"}",
+          "GenerateStringKey": "password",
+          "PasswordLength": 40,
+          "ExcludeCharacters": "\"'\\/@`"
+        },
+        "Tags": [
+          {"Key": "Project", "Value": "SozoRockCanada"},
+          {"Key": "Environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "AccessProfile", "Value": "learning"}
+        ]
+      }
+    },
+    "DomainCluster": {
+      "Type": "AWS::RDS::DBCluster",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "DBClusterIdentifier": {"Ref": "ClusterIdentifier"},
+        "DatabaseName": {"Ref": "DatabaseName"},
+        "DBSubnetGroupName": {"Ref": "DomainSubnetGroup"},
+        "VpcSecurityGroupIds": [{"Ref": "DomainSecurityGroup"}],
+        "Engine": "aurora-postgresql",
+        "EngineMode": "provisioned",
+        "EngineVersion": {"Ref": "EngineVersion"},
+        "EngineLifecycleSupport": "open-source-rds-extended-support-disabled",
+        "MasterUsername": "sozorock_admin",
+        "ManageMasterUserPassword": true,
+        "MasterUserSecret": {
+          "KmsKeyId": {"Fn::GetAtt": ["DomainDataKey", "Arn"]}
+        },
+        "EnableHttpEndpoint": true,
+        "EnableIAMDatabaseAuthentication": false,
+        "StorageEncrypted": true,
+        "KmsKeyId": {"Fn::GetAtt": ["DomainDataKey", "Arn"]},
+        "DeletionProtection": true,
+        "BackupRetentionPeriod": 7,
+        "CopyTagsToSnapshot": true,
+        "Port": 5432,
+        "ServerlessV2ScalingConfiguration": {
+          "MinCapacity": 0,
+          "MaxCapacity": {"Ref": "MaxCapacity"},
+          "SecondsUntilAutoPause": {"Ref": "SecondsUntilAutoPause"}
+        },
+        "Tags": [
+          {"Key": "Project", "Value": "SozoRockCanada"},
+          {"Key": "Environment", "Value": {"Ref": "EnvironmentName"}},
+          {"Key": "DataClass", "Value": "controlled-domain-data"}
+        ]
+      }
+    },
+    "DomainWriter": {
+      "Type": "AWS::RDS::DBInstance",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "DBClusterIdentifier": {"Ref": "DomainCluster"},
+        "DBInstanceIdentifier": {"Fn::Sub": "${ClusterIdentifier}-writer"},
+        "DBInstanceClass": "db.serverless",
+        "Engine": "aurora-postgresql",
+        "PubliclyAccessible": false,
+        "AutoMinorVersionUpgrade": true,
+        "Tags": [
+          {"Key": "Project", "Value": "SozoRockCanada"},
+          {"Key": "Environment", "Value": {"Ref": "EnvironmentName"}}
+        ]
+      }
+    },
+    "DomainMigrationPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "Description": "Apply reviewed PostgreSQL schema migrations and bootstrap restricted runtime roles through RDS Data API.",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "MigrationDataApi",
+              "Effect": "Allow",
+              "Action": [
+                "rds-data:ExecuteStatement",
+                "rds-data:BatchExecuteStatement",
+                "rds-data:BeginTransaction",
+                "rds-data:CommitTransaction",
+                "rds-data:RollbackTransaction"
+              ],
+              "Resource": {"Fn::GetAtt": ["DomainCluster", "DBClusterArn"]}
+            },
+            {
+              "Sid": "MigrationSecrets",
+              "Effect": "Allow",
+              "Action": "secretsmanager:GetSecretValue",
+              "Resource": [
+                {"Fn::GetAtt": ["DomainCluster", "MasterUserSecret.SecretArn"]},
+                {"Ref": "IntelligenceRuntimeSecret"},
+                {"Ref": "LearningRuntimeSecret"}
+              ]
+            },
+            {
+              "Sid": "MigrationSecretKms",
+              "Effect": "Allow",
+              "Action": ["kms:Decrypt", "kms:DescribeKey"],
+              "Resource": {"Fn::GetAtt": ["DomainDataKey", "Arn"]}
+            }
+          ]
+        }
+      }
+    },
+    "IntelligenceDataApiPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "Description": "Use the restricted intelligence PostgreSQL role through RDS Data API.",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "IntelligenceDataApi",
+              "Effect": "Allow",
+              "Action": [
+                "rds-data:ExecuteStatement",
+                "rds-data:BatchExecuteStatement",
+                "rds-data:BeginTransaction",
+                "rds-data:CommitTransaction",
+                "rds-data:RollbackTransaction"
+              ],
+              "Resource": {"Fn::GetAtt": ["DomainCluster", "DBClusterArn"]}
+            },
+            {
+              "Sid": "IntelligenceSecret",
+              "Effect": "Allow",
+              "Action": "secretsmanager:GetSecretValue",
+              "Resource": {"Ref": "IntelligenceRuntimeSecret"}
+            },
+            {
+              "Sid": "IntelligenceKms",
+              "Effect": "Allow",
+              "Action": ["kms:Decrypt", "kms:DescribeKey"],
+              "Resource": {"Fn::GetAtt": ["DomainDataKey", "Arn"]}
+            }
+          ]
+        }
+      }
+    },
+    "LearningDataApiPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "Description": "Use the restricted reviewed-learning PostgreSQL role through RDS Data API.",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "LearningDataApi",
+              "Effect": "Allow",
+              "Action": [
+                "rds-data:ExecuteStatement",
+                "rds-data:BatchExecuteStatement",
+                "rds-data:BeginTransaction",
+                "rds-data:CommitTransaction",
+                "rds-data:RollbackTransaction"
+              ],
+              "Resource": {"Fn::GetAtt": ["DomainCluster", "DBClusterArn"]}
+            },
+            {
+              "Sid": "LearningSecret",
+              "Effect": "Allow",
+              "Action": "secretsmanager:GetSecretValue",
+              "Resource": {"Ref": "LearningRuntimeSecret"}
+            },
+            {
+              "Sid": "LearningKms",
+              "Effect": "Allow",
+              "Action": ["kms:Decrypt", "kms:DescribeKey"],
+              "Resource": {"Fn::GetAtt": ["DomainDataKey", "Arn"]}
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "DomainClusterArn": {"Value": {"Fn::GetAtt": ["DomainCluster", "DBClusterArn"]}},
+    "DomainClusterIdentifier": {"Value": {"Ref": "DomainCluster"}},
+    "DomainDatabaseName": {"Value": {"Ref": "DatabaseName"}},
+    "MasterUserSecretArn": {"Value": {"Fn::GetAtt": ["DomainCluster", "MasterUserSecret.SecretArn"]}},
+    "IntelligenceRuntimeSecretArn": {"Value": {"Ref": "IntelligenceRuntimeSecret"}},
+    "LearningRuntimeSecretArn": {"Value": {"Ref": "LearningRuntimeSecret"}},
+    "DomainMigrationPolicyArn": {"Value": {"Ref": "DomainMigrationPolicy"}},
+    "IntelligenceDataApiPolicyArn": {"Value": {"Ref": "IntelligenceDataApiPolicy"}},
+    "LearningDataApiPolicyArn": {"Value": {"Ref": "LearningDataApiPolicy"}},
+    "DomainVpcId": {"Value": {"Ref": "DomainVpc"}}
+  }
+}

@@ -35,6 +35,12 @@ jobs:
         run: python scripts/validate_durable_execution.py
       - name: Check durable execution deployment script syntax
         run: bash -n scripts/deploy_durable_execution.sh
+      - name: Validate PostgreSQL domain data contract
+        run: python scripts/validate_domain_data.py
+      - name: Check PostgreSQL domain deployment script syntax
+        run: bash -n scripts/deploy_domain_data.sh
+      - name: Run domain data API and migration tests
+        run: python -m unittest runtime.test_domain_data_api runtime.test_domain_migrations -v
       - name: Run deterministic curriculum compiler tests
         run: PYTHONPATH=compiler/src python -m unittest discover -s compiler/tests -v
       - name: Validate graph authority contracts
