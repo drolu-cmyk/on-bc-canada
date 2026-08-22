@@ -43,6 +43,7 @@ The program publishes only claims supported by current records. Participation is
 - [Work Intelligence Graph](docs/work-intelligence-graph.md)
 - [Learner Capability Graph](docs/capability-graph.md)
 - [Learning Graph](docs/learning-graph.md)
+- [Product Development Graph](docs/product-development-graph.md)
 - [Specialization curriculum](docs/specialization-curriculum.md)
 - [Automation capabilities](docs/automation-capabilities.md)
 - [Learner operations](docs/learner-operations.md)
